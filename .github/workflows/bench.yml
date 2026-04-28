@@ -11,7 +11,6 @@ jobs:
     strategy:
       matrix:
         bench:
-          - body
           - end_to_end
     steps:
       - uses: actions/checkout@v6
@@ -21,12 +20,7 @@ jobs:
 
       # Run benchmark and stores the output to a file
       - name: Run benchmark
-        env:
-          CARGO_TERM_COLOR: never
         run: cargo bench --bench ${{ matrix.bench }} | tee output.txt
-
-      - name: Show bench output
-        run: cat output.txt
 
       # Download previous benchmark result from cache (if exists)
       - name: Download previous benchmark data
