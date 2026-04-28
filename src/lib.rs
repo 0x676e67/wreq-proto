@@ -1,8 +1,11 @@
 #![deny(unused)]
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
+#![allow(unexpected_cfgs)]
+#![cfg_attr(test, deny(rust_2018_idioms))]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![cfg_attr(all(test, feature = "nightly"), feature(test))]
 
 //! # wreq-proto
 //!
