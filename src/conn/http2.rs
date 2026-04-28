@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use http::{Request, Response};
@@ -13,15 +13,15 @@ use http_body::Body;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
-    Result,
     body::Incoming,
     dispatch::{self, TrySendError},
     error::{BoxError, Error},
     proto::{
         self,
-        http2::{Http2Options, ping},
+        http2::{ping, Http2Options},
     },
-    rt::{Time, Timer, bounds::Http2ClientConnExec},
+    rt::{bounds::Http2ClientConnExec, Time, Timer},
+    Result,
 };
 
 /// The sender side of an established connection.
@@ -186,17 +186,19 @@ where
 
     /// Provide a timer to execute background HTTP2 tasks.
     #[inline]
-    pub fn timer<M>(&mut self, timer: M)
+    pub fn timer<M>(mut self, timer: M) -> Self
     where
         M: Timer + Send + Sync + 'static,
     {
         self.timer = Time::Timer(Arc::new(timer));
+        self
     }
 
     /// Provide a options configuration for the HTTP/2 connection.
     #[inline]
-    pub fn options(&mut self, opts: Http2Options) {
+    pub fn options(mut self, opts: Http2Options) -> Self {
         self.opts = opts;
+        self
     }
 
     /// Constructs a connection with the configured options and IO.

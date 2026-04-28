@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use http::{
+    header::{HeaderValue, ValueIter, CONTENT_LENGTH},
     HeaderMap, Method,
-    header::{CONTENT_LENGTH, HeaderValue, ValueIter},
 };
 
 #[inline]

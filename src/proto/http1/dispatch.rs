@@ -3,7 +3,7 @@ use std::{
     future::Future,
     marker::Unpin,
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use bytes::{Buf, Bytes};
@@ -13,12 +13,12 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::{BodyLength, Conn, Http1Transaction, MessageHead, Wants};
 use crate::{
-    Error, Result,
     body::{self, DecodedLength, Incoming},
     dispatch::{self, TrySendError},
     error::BoxError,
     proto::{self, Dispatched, RequestHead},
     upgrade::OnUpgrade,
+    Error, Result,
 };
 
 pub(crate) struct Dispatcher<D, Bs: Body, I, T> {
@@ -87,6 +87,22 @@ where
     pub(crate) fn into_inner(self) -> (I, Bytes, D) {
         let (io, buf) = self.conn.into_inner();
         (io, buf, self.dispatch)
+    }
+
+    /// Run this dispatcher until HTTP says this connection is done,
+    /// but don't call `Write::shutdown` on the underlying IO.
+    ///
+    /// This is useful for old-style HTTP upgrades, but ignores
+    /// newer-style upgrade API.
+    pub(crate) fn poll_without_shutdown(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<crate::Result<()>> {
+        Pin::new(self).poll_catch(cx, false).map_ok(|ds| {
+            if let Dispatched::Upgrade(pending) = ds {
+                pending.manual();
+            }
+        })
     }
 
     fn poll_catch(

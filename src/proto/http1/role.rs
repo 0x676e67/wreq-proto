@@ -5,19 +5,19 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use http::{
-    Method, StatusCode, Version,
     header::{self, Entry, HeaderMap, HeaderName, HeaderValue},
+    Method, StatusCode, Version,
 };
-use smallvec::{SmallVec, smallvec, smallvec_inline};
+use smallvec::{smallvec, smallvec_inline, SmallVec};
 
-use super::{Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage, ext::ReasonPhrase};
+use super::{ext::ReasonPhrase, Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{
-    Error, Result,
     body::DecodedLength,
     config::RequestConfig,
     error::Parse,
     header::OrigHeaderMap,
-    proto::{BodyLength, MessageHead, RequestHead, RequestLine, headers},
+    proto::{headers, BodyLength, MessageHead, RequestHead, RequestLine},
+    Error, Result,
 };
 
 /// totally scientific
@@ -256,7 +256,8 @@ impl Http1Transaction for Client {
     fn encode(msg: Encode<'_, Self::Outgoing>, dst: &mut Vec<u8>) -> Result<Encoder> {
         trace!(
             "Client::encode method={:?}, body={:?}",
-            msg.head.subject.0, msg.body
+            msg.head.subject.0,
+            msg.body
         );
 
         *msg.req_method = Some(msg.head.subject.0.clone());

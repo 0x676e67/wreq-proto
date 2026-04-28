@@ -3,7 +3,7 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
@@ -13,14 +13,14 @@ use httparse::ParserConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
-    Error, Result,
     body::Incoming,
     dispatch::{self, TrySendError},
     error::BoxError,
     proto::{
         self,
-        http1::{self, Http1Options, conn::Conn, role::Client},
+        http1::{self, conn::Conn, role::Client, Http1Options},
     },
+    Error, Result,
 };
 
 /// The sender side of an established connection.
@@ -169,6 +169,32 @@ where
     pub fn with_upgrades(self) -> upgrades::UpgradeableConnection<T, B> {
         upgrades::UpgradeableConnection { inner: Some(self) }
     }
+
+    /// Poll the connection for completion, but without calling `shutdown`
+    /// on the underlying IO.
+    ///
+    /// This is useful to allow running a connection while doing an HTTP
+    /// upgrade. Once the upgrade is completed, the connection would be "done",
+    /// but it is not desired to actually shutdown the IO object. Instead you
+    /// would take it back using `into_parts`.
+    ///
+    /// Use [`poll_fn`](https://docs.rs/futures/0.1.25/futures/future/fn.poll_fn.html)
+    /// and [`try_ready!`](https://docs.rs/futures/0.1.25/futures/macro.try_ready.html)
+    /// to work with this function; or use the `without_shutdown` wrapper.
+    pub fn poll_without_shutdown(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<()>> {
+        self.inner.poll_without_shutdown(cx)
+    }
+
+    /// Prevent shutdown of the underlying IO object at the end of service the request,
+    /// instead run `into_parts`. This is a convenience wrapper over `poll_without_shutdown`.
+    pub async fn without_shutdown(self) -> crate::Result<Parts<T>> {
+        let mut conn = Some(self);
+        std::future::poll_fn(move |cx| -> Poll<crate::Result<Parts<T>>> {
+            ready!(conn.as_mut().unwrap().poll_without_shutdown(cx))?;
+            Poll::Ready(Ok(conn.take().unwrap().into_parts()))
+        })
+        .await
+    }
 }
 
 impl<T, B> Future for Connection<T, B>
@@ -200,8 +226,9 @@ where
 impl Builder {
     /// Provide a options configuration for the HTTP/1 connection.
     #[inline]
-    pub fn options(&mut self, opts: Http1Options) {
+    pub fn options(mut self, opts: Http1Options) -> Self {
         self.opts = opts;
+        self
     }
 
     /// Constructs a connection with the configured options and IO.

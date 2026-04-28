@@ -28,10 +28,10 @@ use std::{
 use http2::{Ping, PingPong};
 
 use crate::{
-    Result,
     error::{Error, Kind, TimedOut},
     rt::{Sleep, Time, Timer},
     sync::Mutex,
+    Result,
 };
 
 type WindowSize = u32;
