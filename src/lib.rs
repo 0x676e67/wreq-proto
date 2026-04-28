@@ -4,6 +4,8 @@
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 
+//! # wreq-proto
+//!
 //! [wreq](https://github.com/0x676e67/wreq) HTTP client protocol and utilities.
 //!
 //! Much of this codebase is adapted and refined from [hyper](https://github.com/hyperium/hyper),
@@ -17,7 +19,6 @@ mod proto;
 
 #[macro_use]
 pub mod config;
-
 pub mod body;
 pub mod conn;
 pub mod header;
@@ -26,7 +27,6 @@ pub mod sync;
 pub mod upgrade;
 
 pub use self::{
-    dispatch::TrySendError,
     error::{Error, Result},
     proto::{http1, http2},
 };
