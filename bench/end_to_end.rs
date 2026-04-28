@@ -11,7 +11,9 @@ use std::{convert::Infallible, net::SocketAddr};
 use futures_util::future::join_all;
 use http::{Method, Request, Response};
 use http_body_util::BodyExt;
-use wreq_proto::{http2::Http2Options, rt::TokioExecutor};
+use wreq_proto::http2::Http2Options;
+
+use crate::support::{rt, tokiort};
 
 type BoxedBody = http_body_util::combinators::BoxBody<bytes::Bytes, Infallible>;
 
@@ -312,7 +314,7 @@ impl Opts {
             if self.http2 {
                 let tcp = tokio::net::TcpStream::connect(&addr).await.unwrap();
 
-                let (tx, conn) = wreq_proto::conn::http2::Builder::new(TokioExecutor::new())
+                let (tx, conn) = wreq_proto::conn::http2::Builder::new(rt::TokioExecutor::new())
                     .options(
                         Http2Options::builder()
                             .initial_window_size(self.http2_stream_window)
@@ -417,10 +419,10 @@ fn spawn_server(rt: &tokio::runtime::Runtime, opts: &Opts) -> SocketAddr {
     rt.spawn(async move {
         let _ = &opts;
         while let Ok((sock, _)) = listener.accept().await {
-            let io = support::TokioIo::new(sock);
+            let io = tokiort::TokioIo::new(sock);
             if opts.http2 {
                 tokio::spawn(
-                    hyper::server::conn::http2::Builder::new(support::TokioExecutor)
+                    hyper::server::conn::http2::Builder::new(tokiort::TokioExecutor)
                         .initial_stream_window_size(opts.http2_stream_window)
                         .initial_connection_window_size(opts.http2_conn_window)
                         .adaptive_window(opts.http2_adaptive_window)

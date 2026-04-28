@@ -37,7 +37,7 @@ want = "0.3.1"
 pin-project-lite = "0.2.17"
 futures-util = { version = "0.3.32", default-features = false }
 smallvec = { version = "1.15.1", features = ["const_generics", "const_new"] }
-tokio = { version = "1.52.1", default-features = false, features = ["time", "rt"]}
+tokio = { version = "1.52.1", default-features = false }
 tokio-util = { version = "0.7.18", default-features = false }
 
 # Optional deps...
@@ -50,6 +50,7 @@ http-body-util = "0.1.3"
 pretty_env_logger = "0.5"
 futures-channel = { version = "0.3", features = ["sink"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc", "sink"] }
+wreq-proto = { path = "." }
 hyper = { version = "1.7.0", default-features = false, features = [
     "http1",
     "http2",
