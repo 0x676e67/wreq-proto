@@ -1,0 +1,32 @@
+#![deny(unused)]
+#![deny(unsafe_code)]
+#![deny(missing_docs)]
+#![cfg_attr(test, deny(warnings))]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+
+//! [wreq](https://github.com/0x676e67/wreq) HTTP client protocol and utilities.
+//!
+//! Much of this codebase is adapted and refined from [hyper](https://github.com/hyperium/hyper),
+//! aiming to match its performance and reliability for asynchronous HTTP/1 and HTTP/2.
+
+#[macro_use]
+mod trace;
+mod dispatch;
+mod error;
+mod proto;
+
+#[macro_use]
+pub mod config;
+
+pub mod body;
+pub mod conn;
+pub mod header;
+pub mod rt;
+pub mod sync;
+pub mod upgrade;
+
+pub use self::{
+    dispatch::TrySendError,
+    error::{Error, Result},
+    proto::{http1, http2},
+};
