@@ -14,6 +14,7 @@ rust-version = "1.85"
 include = ["README.md", "LICENSE", "src/**/*.rs"]
 
 [features]
+default = []
 
 # Enable tracing logging.
 tracing = ["dep:tracing", "http2/tracing", "tracing?/std"]
