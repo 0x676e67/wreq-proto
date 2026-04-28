@@ -7,25 +7,25 @@ use std::{
     future::Future,
     io::{self, Cursor, IoSlice},
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 
 use bytes::{Buf, Bytes};
 use http::{
+    header::{HeaderName, CONNECTION, TE, TRANSFER_ENCODING, UPGRADE},
     HeaderMap,
-    header::{CONNECTION, HeaderName, TE, TRANSFER_ENCODING, UPGRADE},
 };
-use http_body::Body;
 pub use http2::frame::{
     Priorities, PrioritiesBuilder, Priority, PseudoId, PseudoOrder, Setting, SettingId,
     SettingsOrder, SettingsOrderBuilder, StreamDependency, StreamId,
 };
 use http2::{Reason, RecvStream, SendStream};
+use http_body::Body;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-use crate::{Error, Result, error::BoxError};
+use crate::{error::BoxError, Error, Result};
 
 /// Default initial stream window size defined in HTTP2 spec.
 const SPEC_WINDOW_SIZE: u32 = 65_535;

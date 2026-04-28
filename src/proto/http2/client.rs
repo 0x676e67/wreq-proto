@@ -3,17 +3,17 @@ use std::{
     future::Future,
     marker::PhantomData,
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
 use futures_util::future::{Either, FusedFuture};
 use http::{Method, Request, Response, StatusCode};
-use http_body::Body;
 use http2::{
-    SendStream,
     client::{Builder, Connection, ResponseFuture, SendRequest},
+    SendStream,
 };
+use http_body::Body;
 use pin_project_lite::pin_project;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
@@ -25,19 +25,20 @@ use tokio::{
 };
 
 use super::{
-    H2Upgraded, PipeToSendStream, SendBuf, ping,
+    ping,
     ping::{Ponger, Recorder},
+    H2Upgraded, PipeToSendStream, SendBuf,
 };
 use crate::{
-    Error, Result,
     body::{self, Incoming},
     config::RequestConfig,
     dispatch::{self, Callback, SendWhen, TrySendError},
     error::BoxError,
     header::OrigHeaderMap,
-    proto::{Dispatched, headers},
-    rt::{Time, bounds::Http2ClientConnExec},
+    proto::{headers, Dispatched},
+    rt::{bounds::Http2ClientConnExec, Time},
     upgrade::{self, Upgraded},
+    Error, Result,
 };
 
 /// Receiver for HTTP/2 client requests

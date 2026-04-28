@@ -3,13 +3,13 @@ use std::{
     fmt::{self, Debug},
     io::{self, IoSlice},
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use bytes::{Buf, Bytes, BytesMut};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use super::{Http1Transaction, ParseContext, ParsedMessage, buf::BufList};
+use super::{buf::BufList, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{Error, Result};
 
 /// The initial buffer size allocated before trying to read from IO.
@@ -657,11 +657,9 @@ mod tests {
                 h1_max_headers: None,
                 h09_responses: false,
             };
-            assert!(
-                buffered
-                    .parse::<http1::role::Client>(cx, parse_ctx)
-                    .is_pending()
-            );
+            assert!(buffered
+                .parse::<http1::role::Client>(cx, parse_ctx)
+                .is_pending());
             Poll::Ready(())
         })
         .await;

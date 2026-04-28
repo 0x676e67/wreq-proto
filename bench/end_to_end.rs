@@ -94,7 +94,7 @@ fn http1_parallel_x10_res_10mb(b: &mut test::Bencher) {
 
 // HTTP2
 
-const HTTP2_MAX_WINDOW: u32 = std::u32::MAX >> 1;
+const HTTP2_MAX_WINDOW: u32 = u32::MAX >> 1;
 
 #[bench]
 fn http2_consecutive_x1_empty(b: &mut test::Bencher) {
@@ -312,15 +312,17 @@ impl Opts {
             if self.http2 {
                 let tcp = tokio::net::TcpStream::connect(&addr).await.unwrap();
 
-                let mut builder = wreq_proto::conn::http2::Builder::new(TokioExecutor::new());
-                builder.options(
-                    Http2Options::builder()
-                        .initial_window_size(self.http2_stream_window)
-                        .initial_connection_window_size(self.http2_conn_window)
-                        .adaptive_window(self.http2_adaptive_window)
-                        .build(),
-                );
-                let (tx, conn) = builder.handshake(tcp).await.unwrap();
+                let (tx, conn) = wreq_proto::conn::http2::Builder::new(TokioExecutor::new())
+                    .options(
+                        Http2Options::builder()
+                            .initial_window_size(self.http2_stream_window)
+                            .initial_connection_window_size(self.http2_conn_window)
+                            .adaptive_window(self.http2_adaptive_window)
+                            .build(),
+                    )
+                    .handshake(tcp)
+                    .await
+                    .unwrap();
                 tokio::spawn(conn);
                 Client::Http2(tx)
             } else if self.parallel_cnt > 1 {
