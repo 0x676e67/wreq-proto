@@ -9,12 +9,8 @@
 
 pub mod bounds;
 mod timer;
-mod tokio;
 
-pub use self::{
-    timer::{Sleep, Time, Timer},
-    tokio::{TokioExecutor, TokioTimer},
-};
+pub use self::timer::{Sleep, Time, Timer};
 
 /// An executor of futures.
 ///

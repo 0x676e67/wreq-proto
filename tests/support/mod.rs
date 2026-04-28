@@ -24,6 +24,7 @@ mod tokiort;
 #[allow(unused)]
 pub use tokiort::{TokioExecutor, TokioIo, TokioTimer};
 
+pub mod rt;
 pub mod trailers;
 
 #[allow(unused_macros)]
@@ -432,7 +433,7 @@ async fn async_test(cfg: __TestConfig) {
 
             let res = if http2_only {
                 let (mut sender, conn) =
-                    wreq_proto::conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+                    wreq_proto::conn::http2::Builder::new(rt::TokioExecutor::new())
                         .handshake(stream)
                         .await
                         .unwrap();
@@ -530,12 +531,11 @@ async fn naive_proxy(cfg: ProxyConfig) -> (SocketAddr, impl Future<Output = ()>)
                             .unwrap();
 
                         let resp = if http2_only {
-                            let (mut sender, conn) = wreq_proto::conn::http2::Builder::new(
-                                wreq_proto::rt::TokioExecutor::new(),
-                            )
-                            .handshake(stream)
-                            .await
-                            .unwrap();
+                            let (mut sender, conn) =
+                                wreq_proto::conn::http2::Builder::new(rt::TokioExecutor::new())
+                                    .handshake(stream)
+                                    .await
+                                    .unwrap();
 
                             tokio::task::spawn(async move {
                                 if let Err(err) = conn.await {

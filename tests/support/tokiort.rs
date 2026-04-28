@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unsafe_code)]
 //! Various runtimes for hyper
 use std::{
     future::Future,

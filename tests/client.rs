@@ -1,6 +1,8 @@
 #![allow(warnings)]
 #![allow(clippy::unused_io_amount)]
 
+mod support;
+
 use std::{
     convert::Infallible,
     fmt,
@@ -24,7 +26,6 @@ use hyper::{
 };
 use support::TokioIo;
 use tokio::net::TcpStream;
-mod support;
 
 fn s(buf: &[u8]) -> &str {
     std::str::from_utf8(buf).expect("from_utf8")
@@ -1528,6 +1529,7 @@ mod conn {
     };
 
     use super::{concat, s, support, tcp_connect, FutureHyperExt};
+    use crate::support::rt;
 
     fn setup_logger() {
         let _ = pretty_env_logger::try_init();
@@ -2291,7 +2293,7 @@ mod conn {
         });
 
         let io = tcp_connect(&addr).await.expect("tcp connect");
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2359,7 +2361,7 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2420,8 +2422,8 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (_client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (_client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .options(
                 Http2Options::builder()
                     .keep_alive_interval(Duration::from_secs(1))
@@ -2451,8 +2453,8 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .options(
                 Http2Options::builder()
                     .keep_alive_interval(Duration::from_secs(1))
@@ -2485,8 +2487,8 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .options(
                 Http2Options::builder()
                     .keep_alive_interval(Duration::from_secs(1))
@@ -2549,8 +2551,8 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .options(
                 Http2Options::builder()
                     .keep_alive_interval(Duration::from_secs(1))
@@ -2608,8 +2610,8 @@ mod conn {
         });
 
         let io = tcp_connect(&addr).await.expect("tcp connect");
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2691,8 +2693,8 @@ mod conn {
         });
 
         let io = tcp_connect(&addr).await.expect("tcp connect");
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
-            .timer(wreq_proto::rt::TokioTimer::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .timer(rt::TokioTimer::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2747,7 +2749,7 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2797,7 +2799,7 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
             .handshake::<_, Empty<Bytes>>(TokioIo::new(io))
             .await
             .expect("http handshake");
@@ -2929,7 +2931,7 @@ mod conn {
         });
 
         let io = TokioIo::new(client_io);
-        let (mut client, conn) = conn::http2::Builder::new(wreq_proto::rt::TokioExecutor::new())
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
             .handshake(TokioIo::new(io))
             .await
             .expect("http handshake");
