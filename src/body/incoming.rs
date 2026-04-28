@@ -1,7 +1,8 @@
 use std::{
     fmt,
+    future::Future,
     pin::Pin,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
 };
 
 use bytes::Bytes;
@@ -10,8 +11,8 @@ use http_body::{Body, Frame, SizeHint};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::PollSender;
 
-use super::{DecodedLength, watch};
-use crate::{Error, Result, proto::http2::ping};
+use super::{watch, DecodedLength};
+use crate::{proto::http2::ping, Error, Result};
 
 /// A stream of [`Bytes`], used when receiving bodies from the network.
 ///

@@ -49,7 +49,7 @@ mod std {
 
     /// Like [`std::sync::MutexGuard`].
     #[must_use]
-    pub struct MutexGuard<'a, T: ?Sized + 'a>(sync::MutexGuard<'a, T>);
+    pub struct MutexGuard<'a, T: ?Sized>(sync::MutexGuard<'a, T>);
 
     impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {
         type Target = T;
@@ -95,7 +95,7 @@ mod std {
 
     /// Like [`std::sync::RwLockReadGuard`].
     #[must_use]
-    pub struct RwLockReadGuard<'a, T: ?Sized + 'a>(sync::RwLockReadGuard<'a, T>);
+    pub struct RwLockReadGuard<'a, T: ?Sized>(sync::RwLockReadGuard<'a, T>);
 
     impl<'a, T: ?Sized> Deref for RwLockReadGuard<'a, T> {
         type Target = T;
@@ -108,7 +108,7 @@ mod std {
 
     /// Like [`std::sync::RwLockWriteGuard`].
     #[must_use]
-    pub struct RwLockWriteGuard<'a, T: ?Sized + 'a>(sync::RwLockWriteGuard<'a, T>);
+    pub struct RwLockWriteGuard<'a, T: ?Sized>(sync::RwLockWriteGuard<'a, T>);
 
     impl<'a, T: ?Sized> Deref for RwLockWriteGuard<'a, T> {
         type Target = T;
