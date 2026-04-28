@@ -26,7 +26,6 @@ pub mod body;
 pub mod conn;
 pub mod header;
 pub mod rt;
-pub mod sync;
 pub mod upgrade;
 
 pub use self::{
