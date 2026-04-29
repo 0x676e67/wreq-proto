@@ -20,8 +20,6 @@ mod dispatch;
 mod error;
 mod proto;
 
-#[macro_use]
-pub mod config;
 pub mod body;
 pub mod conn;
 pub mod ext;
