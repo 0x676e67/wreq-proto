@@ -33,7 +33,7 @@ use crate::{
     body::{self, Incoming},
     dispatch::{self, Callback, SendWhen, TrySendError},
     error::BoxError,
-    ext::OnHeaderSort,
+    ext::OnPreserveHeader,
     proto::{headers, Dispatched},
     rt::{bounds::Http2ClientConnExec, Time},
     upgrade::{self, Upgraded},
@@ -594,7 +594,7 @@ where
                     }
 
                     // Sort headers
-                    if let Some(header_sort) = req.extensions_mut().remove::<OnHeaderSort>() {
+                    if let Some(header_sort) = req.extensions_mut().remove::<OnPreserveHeader>() {
                         header_sort.call(req.headers_mut());
                     }
 

@@ -140,15 +140,15 @@ impl wreq_proto::ext::OnPreserveHeaderCallback for OrigHeaderMap {
 
     /// Calls the given function for each header in this map's order, preserving original casing.
     /// Headers in the map are processed first, others follow.
-    fn call_for_each(
+    fn call_visit(
         &self,
         headers: &mut HeaderMap,
-        write: &mut dyn FnMut(&[u8], &http::HeaderValue),
+        write: &mut dyn FnMut(&dyn AsRef<[u8]>, &http::HeaderValue),
     ) {
         // First, sort headers according to the order defined in this map
         for (name, orig_name) in self.iter() {
             for value in headers.get_all(name) {
-                write(orig_name.as_ref(), value);
+                write(orig_name, value);
             }
 
             headers.remove(name);
@@ -159,11 +159,11 @@ impl wreq_proto::ext::OnPreserveHeaderCallback for OrigHeaderMap {
         for (name, value) in headers.drain() {
             match (name, &prev_name) {
                 (Some(name), _) => {
-                    write(name.as_ref(), &value);
+                    write(&name, &value);
                     prev_name.replace(name.into_orig_header_name());
                 }
                 (None, Some(prev_name)) => {
-                    write(prev_name.as_ref(), &value);
+                    write(&prev_name, &value);
                 }
                 _ => (),
             };
