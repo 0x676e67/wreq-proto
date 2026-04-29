@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/0x676e67/wreq-proto/compare/v0.1.0...v0.2.0) - 2026-04-29
+
+### Other
+
+- Fix capitalization in package description
+- *(ext)* rename method to `call_visit` and clarify its purpose ([#10](https://github.com/0x676e67/wreq-proto/pull/10))
+
 ## [0.1.0](https://github.com/0x676e67/wreq-proto/releases/tag/v0.1.0) - 2026-04-29
 
 ### Added

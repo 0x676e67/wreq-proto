@@ -1,6 +1,6 @@
 [package]
 name = "wreq-proto"
-version = "0.1.0"
+version = "0.2.0"
 description = "Protocol utilities for wreq"
 keywords = ["http", "client"]
 categories = ["web-programming::http-client"]
