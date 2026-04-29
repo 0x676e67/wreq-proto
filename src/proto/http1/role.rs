@@ -14,7 +14,7 @@ use super::{Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{
     body::DecodedLength,
     error::Parse,
-    ext::{OnHeaderSort, ReasonPhrase},
+    ext::{OnPreserveHeader, ReasonPhrase},
     proto::{headers, BodyLength, MessageHead, RequestHead, RequestLine},
     Error, Result,
 };
@@ -289,8 +289,19 @@ impl Http1Transaction for Client {
         }
         extend(dst, b"\r\n");
 
-        if let Some(header_sort) = &msg.head.extensions.get::<OnHeaderSort>() {
-            write_headers_original_case(&mut msg.head.headers, header_sort, dst);
+        if let Some(header_sort) = &msg.head.extensions.get::<OnPreserveHeader>() {
+            header_sort.call_visit(&mut msg.head.headers, &mut |name, value| {
+                extend(dst, name.as_ref());
+
+                // Wanted for curl test cases that send `X-Custom-Header:\r\n`
+                if value.is_empty() {
+                    extend(dst, b":\r\n");
+                } else {
+                    extend(dst, b": ");
+                    extend(dst, value.as_bytes());
+                    extend(dst, b"\r\n");
+                }
+            });
         } else {
             write_headers(&msg.head.headers, dst);
         }
@@ -643,25 +654,6 @@ pub(crate) fn write_headers(headers: &HeaderMap, dst: &mut Vec<u8>) {
         extend(dst, value.as_bytes());
         extend(dst, b"\r\n");
     }
-}
-
-fn write_headers_original_case(
-    headers: &mut HeaderMap,
-    header_sort: &OnHeaderSort,
-    dst: &mut Vec<u8>,
-) {
-    header_sort.call_for_each(headers, &mut |orig_name, value| {
-        extend(dst, orig_name);
-
-        // Wanted for curl test cases that send `X-Custom-Header:\r\n`
-        if value.is_empty() {
-            extend(dst, b":\r\n");
-        } else {
-            extend(dst, b": ");
-            extend(dst, value.as_bytes());
-            extend(dst, b"\r\n");
-        }
-    });
 }
 
 struct FastWrite<'a>(&'a mut Vec<u8>);
