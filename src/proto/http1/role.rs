@@ -10,11 +10,12 @@ use http::{
 };
 use smallvec::{smallvec, smallvec_inline, SmallVec};
 
-use super::{ext::ReasonPhrase, Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
+use super::{Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{
     body::DecodedLength,
     config::RequestConfig,
     error::Parse,
+    ext::ReasonPhrase,
     header::OrigHeaderMap,
     proto::{headers, BodyLength, MessageHead, RequestHead, RequestLine},
     Error, Result,
@@ -233,6 +234,7 @@ impl Http1Transaction for Client {
                 headers,
                 extensions,
             };
+
             if let Some((decode, is_upgrade)) = Client::decoder(&head, ctx.req_method)? {
                 return Ok(Some(ParsedMessage {
                     head,
@@ -243,6 +245,12 @@ impl Http1Transaction for Client {
                     keep_alive: keep_alive && !is_upgrade,
                     wants_upgrade: is_upgrade,
                 }));
+            }
+
+            if head.subject.is_informational() {
+                if let Some(callback) = ctx.on_informational {
+                    callback.call(head.into_response(()));
+                }
             }
 
             // Parsing a 1xx response could have consumed the buffer, check if
