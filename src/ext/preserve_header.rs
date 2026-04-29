@@ -6,17 +6,22 @@ use http::{HeaderMap, HeaderValue};
 ///
 /// # Example
 /// ```
+/// use http::header::{HeaderMap, HeaderValue};
 /// use wreq_proto::ext::{on_preserve_header, OnPreserveHeaderCallback};
 ///
 /// struct HeaderPreserver;
 ///
 /// impl OnPreserveHeaderCallback for HeaderPreserver {
 ///
-///   fn call(&self, headers: &mut http::HeaderMap) {
+///   fn call(&self, headers: &mut HeaderMap) {
 ///     // Modify or sort headers as needed before serialization
 ///   }
 ///
-///   fn call_visit(&self, headers: &mut http::HeaderMap, dst: &mut dyn FnMut(&[u8], &http::HeaderValue)) {
+///   fn call_visit(
+///       &self,
+///       headers: &mut HeaderMap,
+///       dst: &mut dyn FnMut(&dyn AsRef<[u8]>, &HeaderValue),
+///   ) {
 ///     // Write headers with custom casing/order
 ///   }
 /// }
