@@ -1,21 +1,22 @@
 //! Streaming bodies for Requests and Responses
 //!
-//! For both [Clients](crate::client), requests and
-//! responses use streaming bodies, instead of complete buffering. This
-//! allows applications to not use memory they don't need, and allows exerting
-//! back-pressure on connections by only reading when asked.
+//! Both clients and servers use streaming bodies for requests and responses, instead of fully
+//! buffering them. This approach avoids unnecessary memory usage and enables back-pressure by only
+//! reading when needed.
 //!
-//! There are two pieces to this in crate::core::
+//! There are two main components:
 //!
-//! - **The [\`Body`\] trait** describes all possible bodies. crate::core: allows any body type that
-//!   implements `Body`, allowing applications to have fine-grained control over their streaming.
-//! - **The [`Incoming`] concrete type**, which is an implementation of `Body`, and returned by
-//!   crate::core: as a "receive stream" (so, for server requests and client responses).
+//! - **[`http_body::Body`] trait**: Describes all possible body types. Any type implementing this
+//!   trait can be used as a body, allowing applications to have fine-grained control over
+//!   streaming.
+//! - **[`Incoming`] concrete type**: An implementation of `Body` provided by this module, used as a
+//!   receive stream (for server requests and client responses).
 //!
-//! There are additional implementations available in [`http-body-util`][],
-//! such as a `Full` or `Empty` body.
+//! Additional implementations are available in [`http-body-util`][], such as `Full` or `Empty`
+//! bodies.
 //!
 //! [`http-body-util`]: https://docs.rs/http-body-util
+//! [`http_body::Body`]: https://docs.rs/http-body
 
 mod incoming;
 mod length;
