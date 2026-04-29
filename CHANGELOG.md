@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/0x676e67/wreq-proto/compare/v0.1.0...v0.1.1) - 2026-04-29
+
+### Other
+
+- release v0.1.0 ([#8](https://github.com/0x676e67/wreq-proto/pull/8))
+
 ## [0.1.0](https://github.com/0x676e67/wreq-proto/releases/tag/v0.1.0) - 2026-04-29
 
 ### Added
