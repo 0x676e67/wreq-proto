@@ -63,15 +63,14 @@ where
         } else {
             WriteStrategy::Flatten
         };
-        let write_buf = WriteBuf::new(strategy);
         Buffered {
             flush_pipeline: false,
             io,
             partial_len: None,
             read_blocked: false,
-            read_buf: BytesMut::with_capacity(0),
+            read_buf: BytesMut::new(),
             read_buf_strategy: ReadStrategy::default(),
-            write_buf,
+            write_buf: WriteBuf::new(strategy),
         }
     }
 
