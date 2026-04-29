@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777476707784,
+  "lastUpdate": 1777477049360,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -2051,6 +2051,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 5290102,
             "range": "± 40700.28",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7fd0c8939fc3041f855eda616ef59f8b6d9df924",
+          "message": "chore: release v0.2.0 (#11)",
+          "timestamp": "2026-04-29T23:34:00+08:00",
+          "tree_id": "f5d8e2fcfc1ed2e6421b8b1b17b0f5cd1afac265",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/7fd0c8939fc3041f855eda616ef59f8b6d9df924"
+        },
+        "date": 1777477048895,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 63138,
+            "range": "± 1040.63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 4403828,
+            "range": "± 245502.33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 22302,
+            "range": "± 296.99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 23471,
+            "range": "± 312.53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 28253,
+            "range": "± 1056.73",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 91755,
+            "range": "± 1463.30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 41000300,
+            "range": "± 35476.58",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 76962,
+            "range": "± 1208.16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 7889642,
+            "range": "± 125151.93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 32689030,
+            "range": "± 8130040.47",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 7672815,
+            "range": "± 85361.71",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 95594139,
+            "range": "± 2000542.10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 55886302,
+            "range": "± 654205.15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 5598728,
+            "range": "± 93089.76",
             "unit": "ns/iter"
           }
         ]
