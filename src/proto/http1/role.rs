@@ -650,7 +650,7 @@ fn write_headers_original_case(
     header_sort: &OnHeaderSort,
     dst: &mut Vec<u8>,
 ) {
-    header_sort.call_for_each(headers, |orig_name, value| {
+    header_sort.call_for_each(headers, &mut |orig_name, value| {
         extend(dst, orig_name);
 
         // Wanted for curl test cases that send `X-Custom-Header:\r\n`

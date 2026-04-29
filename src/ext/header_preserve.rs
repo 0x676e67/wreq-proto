@@ -1,9 +1,6 @@
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 use http::HeaderMap;
-
-#[derive(Clone)]
-pub(crate) struct OnHeaderSort(Arc<dyn OnPreserveHeaderCallback>);
 
 /// Registers a callback to customize header order and casing before sending a request.
 ///
@@ -70,25 +67,14 @@ pub trait OnPreserveHeaderCallback: Sync + Send + 'static {
     );
 }
 
-impl OnHeaderSort {
-    /// Execute the registered header modification callback.
-    ///
-    /// This is called internally during request serialization to apply
-    /// the user's header modifications before writing headers to the wire.
-    #[inline]
-    pub(crate) fn call(&self, headers: &mut HeaderMap) {
-        self.0.call(headers);
-    }
+#[derive(Clone)]
+pub(crate) struct OnHeaderSort(Arc<dyn OnPreserveHeaderCallback>);
 
-    /// Execute the registered header writing callback.
-    ///
-    /// This is called internally during request serialization to write
-    /// headers with the user's custom casing/order logic.
+impl Deref for OnHeaderSort {
+    type Target = Arc<dyn OnPreserveHeaderCallback>;
+
     #[inline]
-    pub(crate) fn call_for_each<F>(&self, headers: &mut HeaderMap, mut dst: F)
-    where
-        F: FnMut(&[u8], &http::HeaderValue),
-    {
-        self.0.call_for_each(headers, &mut dst);
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
