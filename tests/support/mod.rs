@@ -24,6 +24,7 @@ mod tokiort;
 #[allow(unused)]
 pub use tokiort::{TokioExecutor, TokioIo, TokioTimer};
 
+pub mod header;
 pub mod rt;
 pub mod trailers;
 
