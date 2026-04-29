@@ -1510,6 +1510,7 @@ mod conn {
     use bytes::{Buf, Bytes};
     use futures_channel::{mpsc, oneshot};
     use futures_util::future::{self, poll_fn, FutureExt, TryFutureExt};
+    use http::{HeaderMap, HeaderName};
     use http_body_util::{BodyExt, Empty, Full, StreamBody};
     use hyper::{
         body::{Body, Frame},
@@ -1529,7 +1530,7 @@ mod conn {
     };
 
     use super::{concat, s, support, tcp_connect, FutureHyperExt};
-    use crate::support::rt;
+    use crate::support::{header::OrigHeaderMap, rt};
 
     fn setup_logger() {
         let _ = pretty_env_logger::try_init();
@@ -2210,6 +2211,56 @@ mod conn {
         });
         let _res = client.try_send_request(req).await.expect("send_request");
         assert_eq!(1, cnt.load(Ordering::Relaxed));
+    }
+
+    #[tokio::test]
+    async fn client_on_preserve_header_ext() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        let (server, addr) = setup_std_test_server();
+
+        thread::spawn(move || {
+            let mut sock = server.accept().unwrap().0;
+            sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            sock.set_write_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut buf = [0; 4096];
+            let n = sock.read(&mut buf).expect("read 1");
+            let req_str = std::str::from_utf8(&buf[..n]).unwrap();
+            // Check that the header order is as expected (custom logic: X-ZZZ first)
+            assert!(req_str.contains("X-ZZZ: first"));
+            assert!(req_str.find("X-ZZZ: first").unwrap() < req_str.find("X-AAA: second").unwrap());
+            sock.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+                .unwrap();
+        });
+
+        let tcp = tcp_connect(&addr).await.unwrap();
+
+        let (mut client, conn) = conn::http1::Builder::default()
+            .handshake(TokioIo::new(tcp))
+            .await
+            .unwrap();
+
+        tokio::spawn(async move {
+            let _ = conn.await;
+        });
+
+        let mut req = Request::builder()
+            .uri("/header-sort")
+            .header("X-AAA", "second")
+            .header("X-ZZZ", "first")
+            .body(Empty::<Bytes>::new())
+            .unwrap();
+
+        let mut orig_headers = OrigHeaderMap::new();
+        orig_headers.insert("X-ZZZ");
+        orig_headers.insert("X-AAA");
+
+        wreq_proto::ext::on_preserve_header(&mut req, orig_headers);
+
+        let _res = client.try_send_request(req).await.expect("send_request");
     }
 
     #[tokio::test]

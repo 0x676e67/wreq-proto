@@ -25,7 +25,6 @@ pub mod config;
 pub mod body;
 pub mod conn;
 pub mod ext;
-pub mod header;
 pub mod rt;
 pub mod upgrade;
 

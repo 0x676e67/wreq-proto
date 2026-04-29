@@ -31,10 +31,9 @@ use super::{
 };
 use crate::{
     body::{self, Incoming},
-    config::RequestConfig,
     dispatch::{self, Callback, SendWhen, TrySendError},
     error::BoxError,
-    header::OrigHeaderMap,
+    ext::OnHeaderSort,
     proto::{headers, Dispatched},
     rt::{bounds::Http2ClientConnExec, Time},
     upgrade::{self, Upgraded},
@@ -594,11 +593,9 @@ where
                         }
                     }
 
-                    // Sort headers if we have the original headers
-                    if let Some(orig_headers) =
-                        RequestConfig::<OrigHeaderMap>::remove(req.extensions_mut())
-                    {
-                        orig_headers.sort_headers(req.headers_mut());
+                    // Sort headers
+                    if let Some(header_sort) = req.extensions_mut().remove::<OnHeaderSort>() {
+                        header_sort.call(req.headers_mut());
                     }
 
                     let is_connect = req.method() == Method::CONNECT;

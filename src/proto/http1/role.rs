@@ -13,10 +13,8 @@ use smallvec::{smallvec, smallvec_inline, SmallVec};
 use super::{Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{
     body::DecodedLength,
-    config::RequestConfig,
     error::Parse,
-    ext::ReasonPhrase,
-    header::OrigHeaderMap,
+    ext::{OnHeaderSort, ReasonPhrase},
     proto::{headers, BodyLength, MessageHead, RequestHead, RequestLine},
     Error, Result,
 };
@@ -291,8 +289,8 @@ impl Http1Transaction for Client {
         }
         extend(dst, b"\r\n");
 
-        if let Some(orig_headers) = RequestConfig::<OrigHeaderMap>::get(&msg.head.extensions) {
-            write_headers_original_case(&mut msg.head.headers, orig_headers, dst);
+        if let Some(header_sort) = &msg.head.extensions.get::<OnHeaderSort>() {
+            write_headers_original_case(&mut msg.head.headers, header_sort, dst);
         } else {
             write_headers(&msg.head.headers, dst);
         }
@@ -649,10 +647,10 @@ pub(crate) fn write_headers(headers: &HeaderMap, dst: &mut Vec<u8>) {
 
 fn write_headers_original_case(
     headers: &mut HeaderMap,
-    orig_headers: &OrigHeaderMap,
+    header_sort: &OnHeaderSort,
     dst: &mut Vec<u8>,
 ) {
-    orig_headers.sort_headers_for_each(headers, |orig_name, value| {
+    header_sort.call_for_each(headers, &mut |orig_name, value| {
         extend(dst, orig_name);
 
         // Wanted for curl test cases that send `X-Custom-Header:\r\n`
