@@ -1648,7 +1648,7 @@ mod conn {
             assert_eq!(res.status(), hyper::StatusCode::OK);
             assert_eq!(
                 res.extensions()
-                    .get::<wreq_proto::http1::ext::ReasonPhrase>()
+                    .get::<wreq_proto::ext::ReasonPhrase>()
                     .expect("custom reason phrase is present")
                     .as_ref(),
                 &b"Alright"[..]
@@ -2165,6 +2165,51 @@ mod conn {
             .body(Empty::<Bytes>::new())
             .unwrap();
         let _res = client.try_send_request(req).await.expect("send_request");
+    }
+
+    #[tokio::test]
+    async fn client_on_informational_ext() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        let (server, addr) = setup_std_test_server();
+
+        thread::spawn(move || {
+            let mut sock = server.accept().unwrap().0;
+            sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            sock.set_write_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut buf = [0; 4096];
+            sock.read(&mut buf).expect("read 1");
+            sock.write_all(b"HTTP/1.1 100 Continue\r\n\r\n").unwrap();
+            sock.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+                .unwrap();
+        });
+
+        let tcp = tcp_connect(&addr).await.unwrap();
+
+        let (mut client, conn) = conn::http1::Builder::default()
+            .handshake(TokioIo::new(tcp))
+            .await
+            .unwrap();
+
+        tokio::spawn(async move {
+            let _ = conn.await;
+        });
+
+        let mut req = Request::builder()
+            .uri("/a")
+            .body(Empty::<Bytes>::new())
+            .unwrap();
+        let cnt = Arc::new(AtomicUsize::new(0));
+        let cnt2 = cnt.clone();
+        wreq_proto::ext::on_informational(&mut req, move |res| {
+            assert_eq!(res.status(), 100);
+            cnt2.fetch_add(1, Ordering::Relaxed);
+        });
+        let _res = client.try_send_request(req).await.expect("send_request");
+        assert_eq!(1, cnt.load(Ordering::Relaxed));
     }
 
     #[tokio::test]

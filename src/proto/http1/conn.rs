@@ -21,6 +21,7 @@ use super::{
 };
 use crate::{
     body::DecodedLength,
+    ext::OnInformational,
     proto::{headers, BodyLength, MessageHead},
     upgrade, Error, Result,
 };
@@ -56,6 +57,7 @@ where
                 h1_parser_config: ParserConfig::default(),
                 h1_max_headers: None,
                 h09_responses: false,
+                on_informational: None,
                 notify_read: false,
                 reading: Reading::Init,
                 writing: Writing::Init,
@@ -169,6 +171,7 @@ where
                 h1_parser_config: &self.state.h1_parser_config,
                 h1_max_headers: self.state.h1_max_headers,
                 h09_responses: self.state.h09_responses,
+                on_informational: &mut self.state.on_informational,
             },
         ) {
             Poll::Ready(Ok(msg)) => msg,
@@ -185,6 +188,9 @@ where
 
         // Prevent accepting HTTP/0.9 responses after the initial one, if any.
         self.state.h09_responses = false;
+
+        // Drop any OnInformational callbacks, we're done there!
+        self.state.on_informational = None;
 
         self.state.busy();
         self.state.keep_alive &= msg.keep_alive;
@@ -532,6 +538,7 @@ where
                 debug_assert!(self.state.cached_headers.is_none());
                 debug_assert!(head.headers.is_empty());
                 self.state.cached_headers = Some(head.headers);
+                self.state.on_informational = head.extensions.remove::<OnInformational>();
 
                 Some(encoder)
             }
@@ -801,6 +808,10 @@ struct State {
     h1_parser_config: ParserConfig,
     h1_max_headers: Option<usize>,
     h09_responses: bool,
+    /// If set, called with each 1xx informational response received for
+    /// the current request. MUST be unset after a non-1xx response is
+    /// received.
+    on_informational: Option<OnInformational>,
     /// Set to true when the Dispatcher should poll read operations
     /// again. See the `maybe_notify` method for more.
     notify_read: bool,
