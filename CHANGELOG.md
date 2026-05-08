@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/0x676e67/wreq-proto/compare/v0.2.1...v0.2.2) - 2026-05-08
+
+### Fixed
+
+- *(http2)* do not reserve capacity before body data is available ([#15](https://github.com/0x676e67/wreq-proto/pull/15))
+
+### Other
+
+- "build(deps): reduce dependency on futures-channel" ([#16](https://github.com/0x676e67/wreq-proto/pull/16))
+- Update README.md
+
 ## [0.2.1](https://github.com/0x676e67/wreq-proto/compare/v0.2.0...v0.2.1) - 2026-04-29
 
 ### Other
