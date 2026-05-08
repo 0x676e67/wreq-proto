@@ -726,9 +726,6 @@ mod tests {
 
         let body = {
             let (mut tx, body) = Incoming::h1(DecodedLength::new(4), false);
-            std::future::poll_fn(|cx| tx.poll_ready(cx))
-                .await
-                .expect("ready");
             tx.send_data("reee".into()).unwrap();
             body
         };
@@ -759,9 +756,6 @@ mod tests {
 
         let body = {
             let (mut tx, body) = Incoming::channel();
-            std::future::poll_fn(|cx| tx.poll_ready(cx))
-                .await
-                .expect("ready");
             tx.send_data("".into()).unwrap();
             body
         };

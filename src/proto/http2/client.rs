@@ -7,7 +7,15 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures_util::future::{Either, FusedFuture};
+use futures_channel::{
+    mpsc,
+    mpsc::{Receiver, Sender},
+    oneshot,
+};
+use futures_util::{
+    future::{Either, FusedFuture},
+    stream::{FusedStream, Stream},
+};
 use http::{Method, Request, Response, StatusCode};
 use http2::{
     client::{Builder, Connection, ResponseFuture, SendRequest},
@@ -15,14 +23,7 @@ use http2::{
 };
 use http_body::Body;
 use pin_project_lite::pin_project;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-        oneshot,
-    },
-};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::{
     ping,
@@ -245,7 +246,7 @@ where
             return Poll::Ready(());
         }
 
-        if this.cancel_tx.is_some() && Pin::new(&mut this.drop_rx).poll_recv(cx).is_ready() {
+        if !this.drop_rx.is_terminated() && Pin::new(&mut this.drop_rx).poll_next(cx).is_ready() {
             // mpsc has been dropped, hopefully polling
             // the connection some more should start shutdown
             // and then close.
