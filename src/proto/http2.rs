@@ -161,9 +161,7 @@ where
                 .map_err(crate::Error::new_body_write)?
             {
                 debug!("stream received RST_STREAM: {:?}", reason);
-                return Poll::Ready(Err(crate::Error::new_body_write(::http2::Error::from(
-                    reason,
-                ))));
+                return Poll::Ready(Err(Error::new_body_write(::http2::Error::from(reason))));
             }
 
             // If a previously-polled chunk is still waiting for stream-level
@@ -192,7 +190,7 @@ where
                 let buf = SendBuf::Buf(peeked.data);
                 me.body_tx
                     .send_data(buf, peeked.is_eos)
-                    .map_err(crate::Error::new_body_write)?;
+                    .map_err(Error::new_body_write)?;
 
                 if peeked.is_eos {
                     return Poll::Ready(Ok(()));
@@ -222,7 +220,7 @@ where
                             let buf = SendBuf::Buf(chunk);
                             me.body_tx
                                 .send_data(buf, is_eos)
-                                .map_err(crate::Error::new_body_write)?;
+                                .map_err(Error::new_body_write)?;
 
                             if is_eos {
                                 return Poll::Ready(Ok(()));
