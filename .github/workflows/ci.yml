@@ -9,7 +9,7 @@ env:
   RUST_BACKTRACE: 1
 
 permissions:
-  contents: read # to fetch code (actions/checkout)
+  contents: read
 
 jobs:
   style:
