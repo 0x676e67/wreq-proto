@@ -8,9 +8,9 @@ repository = { workspace = true }
 documentation = "https://docs.rs/wreq-proto"
 authors = ["0x676e67 <gngppz@gmail.com>", "Sean McArthur <sean@seanmonstar.com>"]
 readme = { workspace = true }
-license = { workspace = true}
+license = { workspace = true }
 edition = "2021"
-rust-version = { workspace = true}
+rust-version = { workspace = true }
 include = ["README.md", "LICENSE", "src/**/*.rs"]
 
 [package.metadata.docs.rs]
