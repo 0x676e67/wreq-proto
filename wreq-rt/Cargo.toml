@@ -8,9 +8,9 @@ repository = { workspace = true }
 documentation = "https://docs.rs/wreq-rt"
 authors = ["0x676e67 <gngppz@gmail.com>"]
 readme = "README.md"
-license = { workspace = true}
+license = { workspace = true }
 edition = "2024"
-rust-version = { workspace = true}
+rust-version = { workspace = true }
 include = ["README.md", "LICENSE", "src/**/*.rs"]
 
 [features]
