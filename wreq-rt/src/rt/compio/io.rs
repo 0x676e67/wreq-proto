@@ -5,7 +5,6 @@
 
 use std::{
     io,
-    mem::MaybeUninit,
     pin::Pin,
     task::{Context, Poll, ready},
 };
@@ -63,14 +62,10 @@ where
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        let uninit = unsafe { buf.unfilled_mut() };
-        uninit.fill(MaybeUninit::new(0));
-        let res = ready!(futures_util::AsyncRead::poll_read(
-            Pin::new(&mut *self.0),
-            cx,
-            unsafe { uninit.assume_init_mut() }
-        ))?;
-        buf.advance(res);
+        let unfilled = unsafe { buf.unfilled_mut() };
+        let len = ready!(self.0.as_mut().poll_read_uninit(cx, unfilled))?;
+        unsafe { buf.assume_init(len) };
+        buf.advance(len);
         Poll::Ready(Ok(()))
     }
 }
