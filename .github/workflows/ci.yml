@@ -29,7 +29,7 @@ jobs:
 
   test:
     name: Test ${{ matrix.rust }} on ${{ matrix.os }}
-    needs: [ style ]
+    needs: [style]
     strategy:
       matrix:
         rust:
@@ -73,7 +73,7 @@ jobs:
 
   msrv:
     name: Check MSRV
-    needs: [ style ]
+    needs: [style]
 
     runs-on: ubuntu-latest
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: Get MSRV from package metadata
         id: msrv
-        run: echo "version=$(yq '.package.rust-version' Cargo.toml)" >> $GITHUB_OUTPUT
+        run: echo "version=$(yq '.workspace.package.rust-version' Cargo.toml)" >> $GITHUB_OUTPUT
 
       - name: Install Rust (${{ steps.msrv.outputs.version }})
         uses: dtolnay/rust-toolchain@master
@@ -104,7 +104,7 @@ jobs:
 
   miri:
     name: Test with Miri
-    needs: [ style ]
+    needs: [style]
     runs-on: ubuntu-latest
 
     steps:
@@ -124,7 +124,7 @@ jobs:
 
   features:
     name: features
-    needs: [ style ]
+    needs: [style]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -138,19 +138,27 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: check default features
+        env:
+          RUSTFLAGS: "-D dead_code -D unused_imports"
+        run: |
+          cargo check -p wreq-proto --no-default-features
+          cargo check -p wreq-rt --no-default-features
+
       - name: check --feature-powerset
         env:
           RUSTFLAGS: "-D dead_code -D unused_imports"
-        run: cargo hack --no-dev-deps check --feature-powerset --depth 2 --skip tracing
+        run: |
+          cargo hack -p wreq-proto --no-dev-deps check --feature-powerset --depth 2 --skip tracing
 
       - name: check --feature-powerset with tracing feature
         env:
           RUSTFLAGS: "-D dead_code -D unused_imports"
-        run: cargo hack --no-dev-deps check --feature-powerset --depth 2 --features
-          tracing
+        run: |
+          cargo hack -p wreq-proto --no-dev-deps check --feature-powerset --depth 2 --features tracing
 
   udeps:
-    needs: [ style ]
+    needs: [style]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
