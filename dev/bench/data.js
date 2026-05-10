@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778431514506,
+  "lastUpdate": 1778431598906,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -3239,6 +3239,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 5544324,
             "range": "± 8159323.96",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ccd6d6bcbbdf7fce2706ea95eaca4ce140101cbb",
+          "message": "Update rust-toolchain",
+          "timestamp": "2026-05-11T00:43:57+08:00",
+          "tree_id": "9eac54099476c5dfe2330a17e75cb46f822513c7",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/ccd6d6bcbbdf7fce2706ea95eaca4ce140101cbb"
+        },
+        "date": 1778431598610,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 70686,
+            "range": "± 2214.79",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 4283115,
+            "range": "± 136876.62",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 21002,
+            "range": "± 505.38",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 23581,
+            "range": "± 530.83",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 34169,
+            "range": "± 948.84",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 105504,
+            "range": "± 3452.16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 41000036,
+            "range": "± 4325.58",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 87675,
+            "range": "± 1271.83",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 32003112,
+            "range": "± 16521759.93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 7642486,
+            "range": "± 151919.02",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 7505762,
+            "range": "± 95826.06",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 50087116,
+            "range": "± 370595.45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 50976131,
+            "range": "± 1003579.04",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 5074420,
+            "range": "± 59284.55",
             "unit": "ns/iter"
           }
         ]
