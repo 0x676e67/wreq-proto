@@ -63,10 +63,7 @@ where
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         let unfilled = unsafe { buf.unfilled_mut() };
-        let len = match ready!(self.0.as_mut().poll_read_uninit(cx, unfilled)) {
-            Ok(n) => n,
-            Err(e) => return Poll::Ready(Err(e)),
-        };
+        let len = ready!(self.0.as_mut().poll_read_uninit(cx, unfilled))?;
         unsafe { buf.assume_init(len) };
         buf.advance(len);
         Poll::Ready(Ok(()))
