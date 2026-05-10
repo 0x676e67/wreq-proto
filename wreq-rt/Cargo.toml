@@ -1,6 +1,6 @@
 [package]
 name = "wreq-rt"
-version = "0.2.2-rc.1"
+version = "0.2.2-rc.2"
 description = "Runtime utilities for wreq"
 keywords = ["http", "client"]
 categories = ["web-programming::http-client"]
