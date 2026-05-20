@@ -29,6 +29,7 @@ use http2::{Ping, PingPong};
 
 use crate::{
     error::{Error, Kind, TimedOut},
+    lock::LockResultExt,
     rt::{Sleep, Time, Timer},
     Result,
 };
@@ -218,7 +219,7 @@ impl Recorder {
             return;
         };
 
-        let mut locked = shared.lock().unwrap();
+        let mut locked = shared.lock().panic_if_poisoned();
         locked.update_last_read_at();
 
         // are we ready to send another bdp ping?
@@ -248,7 +249,7 @@ impl Recorder {
             return;
         };
 
-        let mut locked = shared.lock().unwrap();
+        let mut locked = shared.lock().panic_if_poisoned();
         locked.update_last_read_at();
     }
 
@@ -264,7 +265,7 @@ impl Recorder {
 
     pub(super) fn ensure_not_timed_out(&self) -> Result<()> {
         if let Some(ref shared) = self.shared {
-            let locked = shared.lock().unwrap();
+            let locked = shared.lock().panic_if_poisoned();
             if locked.is_keep_alive_timed_out {
                 return Err(KeepAliveTimedOut.crate_error());
             }
