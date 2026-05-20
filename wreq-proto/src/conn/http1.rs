@@ -190,8 +190,14 @@ where
     pub async fn without_shutdown(self) -> crate::Result<Parts<T>> {
         let mut conn = Some(self);
         std::future::poll_fn(move |cx| -> Poll<crate::Result<Parts<T>>> {
-            ready!(conn.as_mut().unwrap().poll_without_shutdown(cx))?;
-            Poll::Ready(Ok(conn.take().unwrap().into_parts()))
+            ready!(conn
+                .as_mut()
+                .expect("client connection polled after completion")
+                .poll_without_shutdown(cx))?;
+            Poll::Ready(Ok(conn
+                .take()
+                .expect("client connection missing before completion")
+                .into_parts()))
         })
         .await
     }

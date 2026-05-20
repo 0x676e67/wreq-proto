@@ -156,7 +156,7 @@ impl Http1Transaction for Client {
                             }
                         };
 
-                        let version = if res.version.unwrap() == 1 {
+                        let version = if res.version.expect("httparse completed") == 1 {
                             Version::HTTP_11
                         } else {
                             Version::HTTP_10
