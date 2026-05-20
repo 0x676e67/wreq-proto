@@ -18,6 +18,7 @@
 mod trace;
 mod dispatch;
 mod error;
+mod lock;
 mod proto;
 
 pub mod body;

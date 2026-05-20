@@ -40,6 +40,7 @@ use tokio::{
 
 use self::rewind::Rewind;
 use super::{Error, Result};
+use crate::lock::LockResultExt;
 
 /// An upgraded HTTP connection.
 ///
@@ -173,7 +174,7 @@ impl Future for OnUpgrade {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.rx {
-            Some(ref rx) => Pin::new(&mut *rx.lock().unwrap())
+            Some(ref rx) => Pin::new(&mut *rx.lock().panic_if_poisoned())
                 .poll(cx)
                 .map(|res| match res {
                     Ok(Ok(upgraded)) => Ok(upgraded),
