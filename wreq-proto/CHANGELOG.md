@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4](https://github.com/0x676e67/wreq-proto/compare/wreq-proto-v0.2.3...wreq-proto-v0.2.4) - 2026-05-20
+
+### Other
+
+- *(lib)* replace unwraps with expects ([#22](https://github.com/0x676e67/wreq-proto/pull/22))
+- *(lib)* use a panic_if_poisoned() helper for mutexes ([#21](https://github.com/0x676e67/wreq-proto/pull/21))
+
 ## [0.2.3](https://github.com/0x676e67/wreq-proto/compare/wreq-proto-v0.2.2...wreq-proto-v0.2.3) - 2026-05-10
 
 ### Other
