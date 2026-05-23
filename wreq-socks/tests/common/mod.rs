@@ -12,4 +12,5 @@ pub const PROXY_ADDR: &str = "127.0.0.1:41080";
 pub const UNIX_SOCKS4_PROXY_ADDR: &str = "/tmp/socks4_proxy.s";
 pub const SOCKS4_PROXY_ADDR: &str = "127.0.0.1:41081";
 pub const ECHO_SERVER_ADDR: &str = "localhost:10007";
+pub const UDP_ECHO_SERVER_ADDR: &str = "127.0.0.1:10008";
 pub const MSG: &[u8] = b"hello";

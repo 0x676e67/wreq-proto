@@ -20,10 +20,9 @@ use crate::{
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
-enum Command {
+pub(crate) enum Command {
     Connect = 0x01,
     Bind = 0x02,
-    #[allow(dead_code)]
     Associate = 0x03,
     #[cfg(feature = "tor")]
     TorResolve = 0xF0,
@@ -127,6 +126,21 @@ impl Socks5Stream<TcpStream> {
         Ok(sock.target_addr().to_owned())
     }
 
+    /// Establishes a UDP association through a SOCKS5 proxy, returning the
+    /// control stream. The relay endpoint to send datagrams to is available via
+    /// [`Socks5Stream::target_addr`].
+    pub(crate) async fn associate<'t, P, T>(
+        proxy: P,
+        target: T,
+        auth: Authentication<'_>,
+    ) -> Result<Socks5Stream<TcpStream>>
+    where
+        P: ToProxyAddrs,
+        T: IntoTargetAddr<'t>,
+    {
+        Self::execute_command(proxy, target, auth, Command::Associate).await
+    }
+
     async fn execute_command<'a, 't, P, T>(
         proxy: P,
         target: T,
@@ -191,6 +205,47 @@ where
             target,
             Authentication::Password { username, password },
             Command::Connect,
+        )
+        .await
+    }
+
+    /// Establishes a UDP association through a SOCKS5 proxy given a socket to it,
+    /// returning the control stream. The relay endpoint to send datagrams to is
+    /// available via [`Socks5Stream::target_addr`].
+    ///
+    /// # Error
+    ///
+    /// It propagates the error that occurs in the conversion from `T` to
+    /// `TargetAddr`.
+    pub async fn associate_with_socket<'t, T>(socket: S, target: T) -> Result<Socks5Stream<S>>
+    where
+        T: IntoTargetAddr<'t>,
+    {
+        Self::execute_command_with_socket(socket, target, Authentication::None, Command::Associate)
+            .await
+    }
+
+    /// Establishes a UDP association through a SOCKS5 proxy using given username,
+    /// password and a socket to the proxy.
+    ///
+    /// # Error
+    ///
+    /// It propagates the error that occurs in the conversion from `T` to
+    /// `TargetAddr`.
+    pub async fn associate_with_password_and_socket<'a, 't, T>(
+        socket: S,
+        target: T,
+        username: &'a str,
+        password: &'a str,
+    ) -> Result<Socks5Stream<S>>
+    where
+        T: IntoTargetAddr<'t>,
+    {
+        Self::execute_command_with_socket(
+            socket,
+            target,
+            Authentication::Password { username, password },
+            Command::Associate,
         )
         .await
     }
