@@ -1,13 +1,13 @@
 use std::{
     io::{Read, Write},
-    net::{SocketAddr, TcpStream as StdTcpStream},
+    net::{Ipv6Addr, SocketAddr, TcpStream as StdTcpStream},
     sync::Mutex,
 };
 
 use once_cell::sync::OnceCell;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, copy, split},
-    net::TcpListener,
+    net::{TcpListener, UdpSocket},
     runtime::Runtime,
 };
 use wreq_socks::{
@@ -25,6 +25,14 @@ pub async fn echo_server() -> Result<()> {
             let (mut reader, mut writer) = stream.split();
             copy(&mut reader, &mut writer).await.unwrap();
         });
+    }
+}
+
+pub async fn udp_echo_server(socket: UdpSocket) -> Result<()> {
+    let mut buf = [0u8; 1500];
+    loop {
+        let (n, from) = socket.recv_from(&mut buf).await?;
+        socket.send_to(&buf[..n], from).await?;
     }
 }
 
@@ -71,6 +79,18 @@ pub fn runtime() -> &'static Mutex<Runtime> {
     RUNTIME.get_or_init(|| {
         let runtime = Runtime::new().expect("Unable to create runtime");
         runtime.spawn(async { echo_server().await.expect("Unable to bind") });
+        // Bind the UDP socket up front so the port is listening before any test
+        // sends to it (a UDP send to an unbound port is silently lost). Bind on
+        // the dual-stack wildcard so a domain target the proxy resolves to either
+        // `127.0.0.1` or `::1` reaches the echo server.
+        let udp_socket = runtime
+            .block_on(UdpSocket::bind(&SocketAddr::from((Ipv6Addr::UNSPECIFIED, 10008))))
+            .expect("Unable to bind UDP");
+        runtime.spawn(async move {
+            udp_echo_server(udp_socket)
+                .await
+                .expect("UDP echo server failed")
+        });
         Mutex::new(runtime)
     })
 }
