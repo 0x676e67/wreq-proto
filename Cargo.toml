@@ -2,6 +2,7 @@
 members = [
     "wreq-proto",
     "wreq-rt",
+    "wreq-socks",
 ]
 resolver = "3"
 
