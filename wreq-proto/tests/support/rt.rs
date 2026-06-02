@@ -56,7 +56,7 @@ impl Connect for TokioRuntime {
     }
 
     #[cfg(unix)]
-    fn unix_connect(&self, _: std::sync::Arc<Path>) -> Connecting {
+    fn unix_connect(&self, _: std::sync::Arc<std::path::Path>) -> Connecting {
         unimplemented!()
     }
 }
