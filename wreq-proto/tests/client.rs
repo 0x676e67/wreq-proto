@@ -1575,6 +1575,75 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_trailers_allow_max_headers() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let max_headers = 10;
+            let (client_io, server_io) = tokio::io::duplex(1024);
+            let server = tokio::spawn(async move {
+                hyper::server::conn::http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(move |_request| async move {
+                            let mut trailers = HeaderMap::new();
+                            let mut names = Vec::new();
+                            for i in 0..max_headers {
+                                let name = format!("trailer{i}");
+                                trailers.insert(
+                                    HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                                    i.to_string().parse().unwrap(),
+                                );
+                                names.push(name);
+                            }
+                            let frames = [
+                                Ok::<_, std::convert::Infallible>(Frame::data(Bytes::from_static(
+                                    b"1234567890abcdef",
+                                ))),
+                                Ok(Frame::trailers(trailers)),
+                            ];
+                            Ok::<_, std::convert::Infallible>(
+                                Response::builder()
+                                    .header("trailer", names.join(", "))
+                                    .body(StreamBody::new(futures_util::stream::iter(frames)))
+                                    .unwrap(),
+                            )
+                        }),
+                    )
+                    .await
+                    .unwrap();
+            });
+            let (mut client, connection) = conn::http1::Builder::default()
+                .options(Http1Options::builder().max_headers(max_headers).build())
+                .handshake(client_io)
+                .await
+                .unwrap();
+            let connection = tokio::spawn(connection);
+            let response = client
+                .try_send_request(
+                    Request::get("/")
+                        .header("te", "trailers")
+                        .body(Empty::<Bytes>::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let (body, trailers) = crate::concat_with_trailers(response.into_body())
+                .await
+                .expect("trailers at limit");
+            assert_eq!(body, "1234567890abcdef");
+            let trailers = trailers.expect("response has trailers");
+            assert_eq!(trailers.len(), max_headers);
+            for i in 0..max_headers {
+                assert_eq!(trailers[format!("trailer{i}")], i.to_string());
+            }
+            connection.await.unwrap().unwrap();
+            server.await.unwrap();
+        })
+        .await
+        .expect("response with trailers at limit should finish");
+    }
+
+    #[tokio::test]
     async fn http1_trailers_preserve_duplicate_values() {
         tokio::time::timeout(Duration::from_secs(5), async {
             let (client_io, server_io) = tokio::io::duplex(1024);

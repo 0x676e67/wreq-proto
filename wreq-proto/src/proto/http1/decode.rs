@@ -207,13 +207,6 @@ impl Decoder {
                         if trailers_buf.is_some() {
                             trace!("found possible trailers");
 
-                            // decoder enforces that trailers count will not exceed h1_max_headers
-                            if *trailers_cnt >= h1_max_headers {
-                                return Poll::Ready(Err(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    "chunk trailers count overflow",
-                                )));
-                            }
                             match decode_trailers(
                                 &mut trailers_buf.take().expect("Trailer is None"),
                                 *trailers_cnt,
@@ -1078,7 +1071,7 @@ mod tests {
         let h1_max_headers = 10;
         let mut scratch = vec![];
         scratch.extend(b"10\r\n1234567890abcdef\r\n0\r\n");
-        for i in 0..h1_max_headers {
+        for i in 0..=h1_max_headers {
             scratch.extend(format!("trailer{i}: {i}\r\n").as_bytes());
         }
         scratch.extend(b"\r\n");
