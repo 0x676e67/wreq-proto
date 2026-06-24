@@ -50,7 +50,7 @@ pretty_env_logger = "0.5"
 futures-channel = { version = "0.3", features = ["sink"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc", "sink"] }
 wreq-proto = { path = "." }
-hyper = { version = "1.7.0", default-features = false, features = [
+hyper = { version = "1.10.1", default-features = false, features = [
     "http1",
     "http2",
     "server",
