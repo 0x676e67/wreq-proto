@@ -179,7 +179,6 @@ where
                     h1_max_headers: parse_ctx.h1_max_headers,
                     h09_responses: parse_ctx.h09_responses,
                     on_informational: parse_ctx.on_informational,
-                    expect_continue_received: parse_ctx.expect_continue_received,
                 },
             )? {
                 Some(msg) => {
@@ -651,7 +650,6 @@ mod tests {
         // We expect a `parse` to be not ready, and so can't await it directly.
         // Rather, this `poll_fn` will wrap the `Poll` result.
         std::future::poll_fn(|cx| {
-            let expect_continue_received = std::cell::Cell::new(false);
             let parse_ctx = ParseContext {
                 cached_headers: &mut None,
                 req_method: &mut None,
@@ -659,7 +657,6 @@ mod tests {
                 h1_max_headers: None,
                 h09_responses: false,
                 on_informational: &mut None,
-                expect_continue_received: &expect_continue_received,
             };
             assert!(buffered
                 .parse::<http1::role::Client>(cx, parse_ctx)

@@ -57,10 +57,6 @@ pub(crate) struct ParseContext<'a> {
     h1_max_headers: Option<usize>,
     h09_responses: bool,
     on_informational: &'a mut Option<OnInformational>,
-    /// Set to true when a `100 Continue` informational response is consumed
-    /// during parsing. Used by the client to know when to start sending the
-    /// request body.
-    expect_continue_received: &'a std::cell::Cell<bool>,
 }
 
 /// Passed to Http1Transaction::encode
@@ -129,18 +125,6 @@ pub struct Http1Options {
 
     /// Whether to allow obsolete multiline headers in HTTP/1 responses.
     pub allow_obsolete_multiline_headers_in_responses: bool,
-
-    /// Whether to wait for a `100 Continue` response before sending the request body
-    /// when the request includes the `Expect: 100-continue` header.
-    ///
-    /// When set to `true`, the client will send the request headers first, wait for
-    /// a `100 Continue` response from the server, and only then send the request body.
-    /// If the server responds with a final status code (non-1xx) instead of `100 Continue`,
-    /// the request body will not be sent.
-    ///
-    /// Default is `None`, which means the client will not wait and will send the
-    /// body immediately.
-    pub h1_expect_continue: Option<bool>,
 }
 
 impl Http1OptionsBuilder {
@@ -262,20 +246,6 @@ impl Http1OptionsBuilder {
     #[inline]
     pub fn allow_obsolete_multiline_headers_in_responses(mut self, value: bool) -> Self {
         self.opts.allow_obsolete_multiline_headers_in_responses = value;
-        self
-    }
-
-    /// Set whether the client should wait for a `100 Continue` response before
-    /// sending the request body when the request includes the `Expect: 100-continue`
-    /// header.
-    ///
-    /// When enabled, the client sends the request headers first, waits for a
-    /// `100 Continue` from the server, and only then sends the body.
-    ///
-    /// Default is `None` (no waiting — body is sent immediately).
-    #[inline]
-    pub fn expect_continue(mut self, enabled: bool) -> Self {
-        self.opts.h1_expect_continue = Some(enabled);
         self
     }
 

@@ -246,9 +246,6 @@ impl Http1Transaction for Client {
             }
 
             if head.subject.is_informational() {
-                if head.subject == StatusCode::CONTINUE {
-                    ctx.expect_continue_received.set(true);
-                }
                 if let Some(callback) = ctx.on_informational {
                     callback.call(head.into_response(()));
                 }

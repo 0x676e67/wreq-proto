@@ -7,7 +7,7 @@ use std::{
 
 use bytes::{Buf, Bytes};
 use http::{
-    header::{HeaderValue, CONNECTION, EXPECT, TE},
+    header::{HeaderValue, CONNECTION, TE},
     HeaderMap, Method, Version,
 };
 use http_body::Frame;
@@ -57,8 +57,6 @@ where
                 h1_parser_config: ParserConfig::default(),
                 h1_max_headers: None,
                 h09_responses: false,
-                expect_continue: false,
-                want_write_after_read: false,
                 on_informational: None,
                 notify_read: false,
                 reading: Reading::Init,
@@ -106,11 +104,6 @@ where
     #[inline]
     pub(crate) fn set_http1_max_headers(&mut self, val: usize) {
         self.state.h1_max_headers = Some(val);
-    }
-
-    #[inline]
-    pub(crate) fn set_expect_continue(&mut self, enabled: bool) {
-        self.state.expect_continue = enabled;
     }
 
     #[inline]
@@ -170,11 +163,6 @@ where
         debug_assert!(self.can_read_head());
         trace!("Conn::read_head");
 
-        // Cell to track whether a `100 Continue` response was consumed during
-        // parsing. When expect-continue is enabled, this signals the connection
-        // to start sending the request body.
-        let expect_continue_received = std::cell::Cell::new(false);
-
         let msg = match self.io.parse::<T>(
             cx,
             ParseContext {
@@ -184,25 +172,11 @@ where
                 h1_max_headers: self.state.h1_max_headers,
                 h09_responses: self.state.h09_responses,
                 on_informational: &mut self.state.on_informational,
-                expect_continue_received: &expect_continue_received,
             },
         ) {
             Poll::Ready(Ok(msg)) => msg,
             Poll::Ready(Err(e)) => return self.on_read_head_error(e),
             Poll::Pending => {
-                // If we're waiting for 100 Continue and just consumed it,
-                // transition from ExpectContinue to Body so the body can
-                // start being sent. Signal to the dispatch that a write
-                // is now needed.
-                if expect_continue_received.get() {
-                    if let Writing::ExpectContinue(encoder) =
-                        std::mem::replace(&mut self.state.writing, Writing::Closed)
-                    {
-                        self.state.writing = Writing::Body(encoder);
-                        self.state.want_write_after_read = true;
-                        cx.waker().wake_by_ref();
-                    }
-                }
                 return Poll::Pending;
             }
         };
@@ -217,27 +191,6 @@ where
 
         // Drop any OnInformational callbacks, we're done there!
         self.state.on_informational = None;
-
-        // If we were waiting for 100 Continue:
-        // - If 100 Continue was received during parsing, transition to Body
-        //   mode so the body can be sent (even if the final response also
-        //   arrived in the same packet).
-        // - If 100 Continue was NOT received (server sent final response
-        //   immediately), drop the body encoder.
-        if let Writing::ExpectContinue(_) = self.state.writing {
-            if expect_continue_received.get() {
-                // 100 Continue was consumed; allow the body to be sent.
-                if let Writing::ExpectContinue(encoder) =
-                    std::mem::replace(&mut self.state.writing, Writing::Closed)
-                {
-                    self.state.writing = Writing::Body(encoder);
-                }
-            } else {
-                // Server responded with a final status without sending 100
-                // Continue; skip sending the body.
-                self.state.writing = Writing::KeepAlive;
-            }
-        }
 
         self.state.busy();
         self.state.keep_alive &= msg.keep_alive;
@@ -382,22 +335,6 @@ where
         ret
     }
 
-    /// Returns true when the expect-continue handshake just completed
-    /// and the write path needs to send the body. The dispatch checks
-    /// this after a read returns Pending so it can proceed to poll_write
-    /// instead of yielding.
-    /// Returns true while the write side is waiting for a 100 Continue
-    /// response before sending the body.
-    pub(super) fn is_waiting_for_continue(&self) -> bool {
-        matches!(self.state.writing, Writing::ExpectContinue(_))
-    }
-
-    pub(super) fn needs_write_after_read(&mut self) -> bool {
-        let val = self.state.want_write_after_read;
-        self.state.want_write_after_read = false;
-        val
-    }
-
     pub(super) fn poll_read_keep_alive(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
         debug_assert!(!self.can_read_head() && !self.can_read_body());
 
@@ -500,7 +437,6 @@ where
 
         match self.state.writing {
             Writing::Body(..) => return,
-            Writing::ExpectContinue(_) => return,
             Writing::Init | Writing::KeepAlive | Writing::Closed => (),
         }
 
@@ -555,38 +491,19 @@ where
     pub(super) fn can_write_body(&self) -> bool {
         match self.state.writing {
             Writing::Body(..) => true,
-            // Don't write body while waiting for 100 Continue
-            Writing::ExpectContinue(_) => false,
             Writing::Init | Writing::KeepAlive | Writing::Closed => false,
         }
     }
 
     #[inline]
     pub(super) fn can_buffer_body(&self) -> bool {
-        if matches!(self.state.writing, Writing::ExpectContinue(_)) {
-            // While waiting for 100 Continue, don't allow body buffering
-            // to prevent the dispatch from prematurely dropping the body.
-            return false;
-        }
         self.io.can_buffer()
     }
 
     pub(super) fn write_head(&mut self, head: MessageHead<T::Outgoing>, body: Option<BodyLength>) {
-        // Check for Expect: 100-continue header before encoding clears headers
-        let has_expect_header = self.state.expect_continue
-            && head.headers.get(EXPECT)
-                .is_some_and(|v| v.as_bytes().eq_ignore_ascii_case(b"100-continue"));
-
         if let Some(encoder) = self.encode_head(head, body) {
             self.state.writing = if !encoder.is_eof() {
-                if has_expect_header {
-                    // When expect-continue is enabled AND the request has the
-                    // Expect: 100-continue header, wait for 100 Continue
-                    // before sending the body.
-                    Writing::ExpectContinue(encoder)
-                } else {
-                    Writing::Body(encoder)
-                }
+                Writing::Body(encoder)
             } else if encoder.is_last() {
                 Writing::Closed
             } else {
@@ -891,14 +808,6 @@ struct State {
     h1_parser_config: ParserConfig,
     h1_max_headers: Option<usize>,
     h09_responses: bool,
-    /// If set, the client will wait for a `100 Continue` response before
-    /// sending the request body when the request includes the
-    /// `Expect: 100-continue` header.
-    expect_continue: bool,
-    /// Set to true inside `poll_read_head` when the state transitions
-    /// from ExpectContinue to Body after receiving 100 Continue. Used by
-    /// the dispatch to continue to the write path instead of blocking.
-    want_write_after_read: bool,
     /// If set, called with each 1xx informational response received for
     /// the current request. MUST be unset after a non-1xx response is
     /// received.
@@ -930,9 +839,6 @@ enum Reading {
 enum Writing {
     Init,
     Body(Encoder),
-    /// Headers sent with `Expect: 100-continue`, waiting for `100 Continue`
-    /// response before sending the body.
-    ExpectContinue(Encoder),
     KeepAlive,
     Closed,
 }
@@ -963,7 +869,6 @@ impl fmt::Debug for Writing {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Writing::Init => f.write_str("Init"),
-            Writing::ExpectContinue(ref enc) => f.debug_tuple("ExpectContinue").field(enc).finish(),
             Writing::Body(ref enc) => f.debug_tuple("Body").field(enc).finish(),
             Writing::KeepAlive => f.write_str("KeepAlive"),
             Writing::Closed => f.write_str("Closed"),

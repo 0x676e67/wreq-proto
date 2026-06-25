@@ -297,13 +297,6 @@ impl Builder {
             conn.set_max_buf_size(max);
         }
 
-        // Enable client-side expect-continue handling if configured
-        if let Some(expect_continue) = self.opts.h1_expect_continue {
-            if expect_continue {
-                conn.set_expect_continue(true);
-            }
-        }
-
         let cd = http1::dispatch::Client::new(rx);
         let proto = http1::dispatch::Dispatcher::new(cd, conn);
 
