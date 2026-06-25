@@ -3373,11 +3373,169 @@ mod conn {
         drop(tx_a);
         let _ = tokio::time::timeout(Duration::from_secs(5), a_handle).await;
     }
+
+    // === Expect: 100-continue client-side tests ===
+
+    #[tokio::test]
+    async fn client_expect_continue_with_100() {
+        setup_logger();
+        let listener = TkTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server = async move {
+            let mut sock = listener.accept().await.unwrap().0;
+            let mut buf = [0u8; 4096];
+
+            let n = sock.read(&mut buf).await.expect("read headers");
+            let headers = s(&buf[..n]);
+            assert!(
+                headers.contains("POST /continue"),
+                "expected POST /continue, got: {headers}"
+            );
+            assert!(
+                headers.contains("expect: 100-continue"),
+                "expected expect header, got: {headers}"
+            );
+            assert!(
+                headers.contains("content-length: 7"),
+                "expected content-length, got: {headers}"
+            );
+            assert!(
+                !headers.contains("foo bar"),
+                "body arrived before 100 Continue"
+            );
+
+            sock.write_all(b"HTTP/1.1 100 Continue\r\n\r\n")
+                .await
+                .unwrap();
+
+            let mut body_buf = [0u8; 1024];
+            let n = sock.read(&mut body_buf).await.expect("read body");
+            let body = s(&body_buf[..n]);
+            assert_eq!(body, "foo bar", "unexpected body");
+
+            sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK")
+                .await
+                .unwrap();
+        };
+
+        let client = async move {
+            let tcp = tcp_connect(&addr).await.expect("connect");
+            let (mut sender, conn) = conn::http1::Builder::default()
+                .options(Http1Options::builder().expect_continue(true).build())
+                .handshake(TokioIo::new(tcp))
+                .await
+                .expect("handshake");
+
+            tokio::task::spawn(async move {
+                conn.await.expect("http conn");
+            });
+
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri("/continue")
+                .header("Host", addr.to_string())
+                .header("Expect", "100-continue")
+                .header("Content-Length", "7")
+                .body(Full::new(Bytes::from("foo bar")))
+                .unwrap();
+
+            let mut resp = sender.try_send_request(req).await.expect("send_request");
+            assert_eq!(resp.status(), StatusCode::OK);
+            let body = concat(resp).await.expect("body");
+            assert_eq!(body.as_ref(), b"OK");
+        };
+
+        future::join(server, client).await;
+    }
+
+    #[tokio::test]
+    async fn client_expect_continue_server_skips() {
+        setup_logger();
+        let listener = TkTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+            .await
+            .unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server = async move {
+            let mut sock = listener.accept().await.unwrap().0;
+            let mut buf = [0u8; 4096];
+
+            let n = sock.read(&mut buf).await.expect("read headers");
+            let headers = s(&buf[..n]);
+            assert!(
+                headers.contains("POST /reject"),
+                "expected POST /reject, got: {headers}"
+            );
+            assert!(
+                headers.contains("expect: 100-continue"),
+                "expected expect header, got: {headers}"
+            );
+            assert!(
+                !headers.contains("foo bar"),
+                "body arrived before 100 Continue"
+            );
+
+            sock.write_all(
+                b"HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\n\r\n",
+            )
+            .await
+            .unwrap();
+
+            // The client should NOT send the body after a final response.
+            let mut leftover = [0u8; 1024];
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                sock.read(&mut leftover),
+            )
+            .await
+            {
+                Ok(Ok(n)) if n > 0 => {
+                    let extra = s(&leftover[..n]);
+                    assert!(
+                        !extra.contains("foo bar"),
+                        "client sent body after final response: {extra}"
+                    );
+                }
+                _ => {}
+            }
+        };
+
+        let client = async move {
+            let tcp = tcp_connect(&addr).await.expect("connect");
+            let (mut sender, conn) = conn::http1::Builder::default()
+                .options(Http1Options::builder().expect_continue(true).build())
+                .handshake(TokioIo::new(tcp))
+                .await
+                .expect("handshake");
+
+            tokio::task::spawn(async move {
+                conn.await.expect("http conn");
+            });
+
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri("/reject")
+                .header("Host", addr.to_string())
+                .header("Expect", "100-continue")
+                .header("Content-Length", "7")
+                .body(Full::new(Bytes::from("foo bar")))
+                .unwrap();
+
+            let mut resp = sender.try_send_request(req).await.expect("send_request");
+            assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        };
+
+        future::join(server, client).await;
+    }
 }
 
 trait FutureHyperExt: TryFuture {
     fn expect(self, msg: &'static str) -> Pin<Box<dyn Future<Output = Self::Ok>>>;
 }
+
 
 impl<F> FutureHyperExt for F
 where

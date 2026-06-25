@@ -58,6 +58,7 @@ where
                 h1_max_headers: None,
                 h09_responses: false,
                 expect_continue: false,
+                want_write_after_read: false,
                 on_informational: None,
                 notify_read: false,
                 reading: Reading::Init,
@@ -191,12 +192,15 @@ where
             Poll::Pending => {
                 // If we're waiting for 100 Continue and just consumed it,
                 // transition from ExpectContinue to Body so the body can
-                // start being sent.
+                // start being sent. Signal to the dispatch that a write
+                // is now needed.
                 if expect_continue_received.get() {
                     if let Writing::ExpectContinue(encoder) =
                         std::mem::replace(&mut self.state.writing, Writing::Closed)
                     {
                         self.state.writing = Writing::Body(encoder);
+                        self.state.want_write_after_read = true;
+                        cx.waker().wake_by_ref();
                     }
                 }
                 return Poll::Pending;
@@ -376,6 +380,22 @@ where
         let ret = self.state.notify_read;
         self.state.notify_read = false;
         ret
+    }
+
+    /// Returns true when the expect-continue handshake just completed
+    /// and the write path needs to send the body. The dispatch checks
+    /// this after a read returns Pending so it can proceed to poll_write
+    /// instead of yielding.
+    /// Returns true while the write side is waiting for a 100 Continue
+    /// response before sending the body.
+    pub(super) fn is_waiting_for_continue(&self) -> bool {
+        matches!(self.state.writing, Writing::ExpectContinue(_))
+    }
+
+    pub(super) fn needs_write_after_read(&mut self) -> bool {
+        let val = self.state.want_write_after_read;
+        self.state.want_write_after_read = false;
+        val
     }
 
     pub(super) fn poll_read_keep_alive(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
@@ -875,6 +895,10 @@ struct State {
     /// sending the request body when the request includes the
     /// `Expect: 100-continue` header.
     expect_continue: bool,
+    /// Set to true inside `poll_read_head` when the state transitions
+    /// from ExpectContinue to Body after receiving 100 Continue. Used by
+    /// the dispatch to continue to the write path instead of blocking.
+    want_write_after_read: bool,
     /// If set, called with each 1xx informational response received for
     /// the current request. MUST be unset after a non-1xx response is
     /// received.

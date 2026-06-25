@@ -206,7 +206,19 @@ where
             if self.is_closing {
                 return Poll::Ready(Ok(()));
             } else if self.conn.can_read_head() {
-                ready!(self.poll_read_head(cx))?;
+                match self.poll_read_head(cx) {
+                    Poll::Ready(Ok(())) => {}
+                    Poll::Pending => {
+                        // After receiving 100 Continue, the conn may need
+                        // to write the body. Yield from read so poll_loop
+                        // continues to poll_write.
+                        if self.conn.needs_write_after_read() {
+                            return Poll::Ready(Ok(()));
+                        }
+                        return Poll::Pending;
+                    }
+                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                }
             } else if let Some(mut body) = self.body_tx.take() {
                 if self.conn.can_read_body() {
                     match body.poll_ready(cx) {
@@ -362,6 +374,11 @@ where
                     return Poll::Ready(Ok(()));
                 }
             } else if !self.conn.can_buffer_body() {
+                // Yield if we're waiting for 100 Continue; there's
+                // nothing to flush and the read path needs to run.
+                if self.conn.is_waiting_for_continue() {
+                    return Poll::Pending;
+                }
                 ready!(self.poll_flush(cx))?;
             } else {
                 // A new scope is needed :(
