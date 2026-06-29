@@ -1575,6 +1575,68 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_request_trailers_preserve_duplicate_values() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client_io, server_io) = tokio::io::duplex(1024);
+            let server = tokio::spawn(async move {
+                hyper::server::conn::http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(
+                            |request: Request<hyper::body::Incoming>| async {
+                                let (body, trailers) =
+                                    crate::concat_with_trailers(request.into_body())
+                                        .await
+                                        .unwrap();
+                                assert_eq!(body, "hello");
+                                let trailers = trailers.expect("request has trailers");
+                                let values = trailers
+                                    .get_all("chunky-trailer")
+                                    .iter()
+                                    .map(|value| value.to_str().unwrap())
+                                    .collect::<Vec<_>>();
+                                assert_eq!(values, ["first", "second"]);
+                                Ok::<_, std::convert::Infallible>(Response::new(
+                                    Empty::<Bytes>::new(),
+                                ))
+                            },
+                        ),
+                    )
+                    .await
+                    .unwrap();
+            });
+            let (mut client, connection) = conn::http1::Builder::default()
+                .handshake(client_io)
+                .await
+                .unwrap();
+            let connection = tokio::spawn(connection);
+            let mut trailers = HeaderMap::new();
+            trailers.append("chunky-trailer", "first".parse().unwrap());
+            trailers.append("chunky-trailer", "second".parse().unwrap());
+            let frames = [
+                Ok::<_, std::convert::Infallible>(Frame::data(Bytes::from_static(b"hello"))),
+                Ok(Frame::trailers(trailers)),
+            ];
+            let response = client
+                .try_send_request(
+                    Request::post("/")
+                        .header("trailer", "chunky-trailer")
+                        .body(StreamBody::new(futures_util::stream::iter(frames)))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            response.into_body().collect().await.unwrap();
+            connection.await.unwrap().unwrap();
+            server.await.unwrap();
+        })
+        .await
+        .expect("request with repeated trailers should finish");
+    }
+
+    #[tokio::test]
     async fn http1_trailers_allow_max_headers() {
         tokio::time::timeout(Duration::from_secs(5), async {
             let max_headers = 10;

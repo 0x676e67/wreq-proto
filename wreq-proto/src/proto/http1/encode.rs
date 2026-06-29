@@ -157,7 +157,7 @@ impl Encoder {
 
                     if allowed_set.contains(name) {
                         if is_valid_trailer_field(name) {
-                            allowed_trailers.insert(name, value);
+                            allowed_trailers.append(name, value);
                         } else {
                             debug!("trailer field is not valid: {}", &name);
                         }
