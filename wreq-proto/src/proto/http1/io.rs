@@ -236,11 +236,6 @@ where
     }
 
     #[inline]
-    pub(crate) fn io_mut(&mut self) -> &mut T {
-        &mut self.io
-    }
-
-    #[inline]
     pub(crate) fn is_read_blocked(&self) -> bool {
         self.read_blocked
     }
@@ -301,6 +296,11 @@ where
             }
         }
         Pin::new(&mut self.io).poll_flush(cx)
+    }
+
+    pub(crate) fn poll_shutdown(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        ready!(self.poll_flush(cx))?;
+        Pin::new(&mut self.io).poll_shutdown(cx)
     }
 }
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6](https://github.com/0x676e67/wreq-proto/compare/wreq-proto-v0.2.5...wreq-proto-v0.2.6) - 2026-06-24
+
+### Fixed
+
+- *(http1)* flush buffered data before shutdown ([#30](https://github.com/0x676e67/wreq-proto/pull/30))
+
 ## [0.2.5](https://github.com/0x676e67/wreq-proto/compare/wreq-proto-v0.2.4...wreq-proto-v0.2.5) - 2026-05-31
 
 ### Fixed
