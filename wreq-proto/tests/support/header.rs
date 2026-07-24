@@ -101,10 +101,11 @@ impl OrigHeaderMap {
     }
 }
 
-impl wreq_proto::ext::OnPreserveHeaderCallback for OrigHeaderMap {
+impl wreq_proto::ext::OnRequestCallback for OrigHeaderMap {
     /// Sorts headers by this map, preserving original casing.
     /// Headers in the map come first, others follow.
-    fn call(&self, headers: &mut HeaderMap) {
+    fn call(&self, request: &mut wreq_proto::ext::RequestContext<'_>) {
+        let headers = request.headers_mut();
         if headers.len() <= 1 || self.0.is_empty() {
             return;
         }
@@ -140,15 +141,17 @@ impl wreq_proto::ext::OnPreserveHeaderCallback for OrigHeaderMap {
 
     /// Calls the given function for each header in this map's order, preserving original casing.
     /// Headers in the map are processed first, others follow.
-    fn call_visit(
+    fn write_headers(
         &self,
-        headers: &mut HeaderMap,
-        write: &mut dyn FnMut(&dyn AsRef<[u8]>, &http::HeaderValue),
+        request: &mut wreq_proto::ext::RequestContext<'_>,
+        write: &mut dyn FnMut(&[u8], &http::HeaderValue),
     ) {
+        let headers = request.headers_mut();
+
         // First, sort headers according to the order defined in this map
         for (name, orig_name) in self.iter() {
             for value in headers.get_all(name) {
-                write(orig_name, value);
+                write(orig_name.as_ref(), value);
             }
 
             headers.remove(name);
@@ -159,11 +162,11 @@ impl wreq_proto::ext::OnPreserveHeaderCallback for OrigHeaderMap {
         for (name, value) in headers.drain() {
             match (name, &prev_name) {
                 (Some(name), _) => {
-                    write(&name, &value);
+                    write(name.as_ref(), &value);
                     prev_name.replace(name.into_orig_header_name());
                 }
                 (None, Some(prev_name)) => {
-                    write(&prev_name, &value);
+                    write(prev_name.as_ref(), &value);
                 }
                 _ => (),
             };

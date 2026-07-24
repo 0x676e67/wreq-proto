@@ -16,7 +16,7 @@ use futures_util::{
     future::{Either, FusedFuture},
     stream::{FusedStream, Stream},
 };
-use http::{Method, Request, Response, StatusCode};
+use http::{Method, Request, Response, StatusCode, Version};
 use http2::{
     client::{Builder, Connection, ResponseFuture, SendRequest},
     SendStream,
@@ -34,7 +34,7 @@ use crate::{
     body::{self, Incoming},
     dispatch::{self, Callback, SendWhen, TrySendError},
     error::BoxError,
-    ext::OnPreserveHeader,
+    ext::{OnRequest, RequestContext},
     proto::{headers, Dispatched},
     rt::{bounds::Http2ClientConnExec, Time},
     upgrade::{self, Upgraded},
@@ -585,25 +585,30 @@ where
                         trace!("request callback is canceled");
                         continue;
                     }
-                    let (head, body) = req.into_parts();
-                    let mut req = ::http::Request::from_parts(head, ());
-                    super::strip_connection_headers(req.headers_mut(), true);
+                    let (mut head, body) = req.into_parts();
+                    super::strip_connection_headers(&mut head.headers, true);
                     if let Some(len) = body.size_hint().exact() {
-                        if len != 0 || headers::method_has_defined_payload_semantics(req.method()) {
-                            headers::set_content_length_if_missing(req.headers_mut(), len);
+                        if len != 0 || headers::method_has_defined_payload_semantics(&head.method) {
+                            headers::set_content_length_if_missing(&mut head.headers, len);
                         }
                     }
 
-                    // Sort headers
-                    if let Some(header_sort) = req.extensions_mut().remove::<OnPreserveHeader>() {
-                        header_sort.call(req.headers_mut());
+                    if let Some(callback) = head.extensions.remove::<OnRequest>() {
+                        callback.call(&mut RequestContext::new(
+                            &head.method,
+                            &head.uri,
+                            // Forwarded requests may retain HTTP/1.x, but the wire protocol is
+                            // HTTP/2.
+                            Version::HTTP_2,
+                            &mut head.headers,
+                        ));
                     }
 
-                    let is_connect = req.method() == Method::CONNECT;
+                    let is_connect = head.method == Method::CONNECT;
                     let eos = body.is_end_stream();
 
                     if is_connect
-                        && headers::content_length_parse_all(req.headers())
+                        && headers::content_length_parse_all(&head.headers)
                             .is_some_and(|len| len != 0)
                     {
                         debug!("h2 connect request with non-zero body not supported");
@@ -614,6 +619,7 @@ where
                         continue;
                     }
 
+                    let req = ::http::Request::from_parts(head, ());
                     let (fut, body_tx) = match self.h2_tx.send_request(req, !is_connect && eos) {
                         Ok(ok) => ok,
                         Err(err) => {

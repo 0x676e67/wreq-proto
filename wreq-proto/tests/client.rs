@@ -1504,7 +1504,7 @@ mod conn {
         pin::Pin,
         sync::{
             atomic::{AtomicUsize, Ordering},
-            Arc,
+            Arc, Mutex,
         },
         task::{Context, Poll},
         thread,
@@ -1514,7 +1514,7 @@ mod conn {
     use bytes::{Buf, Bytes};
     use futures_channel::{mpsc, oneshot};
     use futures_util::future::{self, poll_fn, FutureExt, TryFutureExt};
-    use http::{HeaderMap, HeaderName};
+    use http::{HeaderMap, HeaderName, HeaderValue, Uri, Version};
     use http_body_util::{BodyExt, Empty, Full, StreamBody};
     use hyper::{
         body::{Body, Frame},
@@ -1529,12 +1529,62 @@ mod conn {
     };
     use wreq_proto::{
         conn::{self},
+        ext::{OnRequestCallback, RequestContext},
         http1::Http1Options,
         http2::Http2Options,
     };
 
     use super::{concat, s, support, tcp_connect, FutureHyperExt};
     use crate::support::{header::OrigHeaderMap, rt};
+
+    struct RecordedRequest {
+        method: Method,
+        uri: Uri,
+        version: Version,
+        headers: Vec<(Vec<u8>, HeaderValue)>,
+    }
+
+    struct RequestRecorder {
+        original_headers: OrigHeaderMap,
+        recorded: Arc<Mutex<Option<RecordedRequest>>>,
+    }
+
+    impl RequestRecorder {
+        fn record(&self, request: &RequestContext<'_>, headers: Vec<(Vec<u8>, HeaderValue)>) {
+            self.recorded.lock().unwrap().replace(RecordedRequest {
+                method: request.method().clone(),
+                uri: request.uri().clone(),
+                version: request.version(),
+                headers,
+            });
+        }
+    }
+
+    impl OnRequestCallback for RequestRecorder {
+        fn call(&self, request: &mut RequestContext<'_>) {
+            self.original_headers.call(request);
+            let headers = request
+                .headers()
+                .iter()
+                .map(|(name, value)| (name.as_str().as_bytes().to_vec(), value.clone()))
+                .collect();
+            self.record(request, headers);
+        }
+
+        fn write_headers(
+            &self,
+            request: &mut RequestContext<'_>,
+            write_header: &mut dyn FnMut(&[u8], &HeaderValue),
+        ) {
+            let mut headers = Vec::with_capacity(request.headers().len());
+            self.original_headers
+                .write_headers(request, &mut |name, value| {
+                    headers.push((name.to_vec(), value.clone()));
+                    write_header(name, value);
+                });
+            self.record(request, headers);
+        }
+    }
 
     fn setup_logger() {
         let _ = pretty_env_logger::try_init();
@@ -2276,7 +2326,7 @@ mod conn {
     }
 
     #[tokio::test]
-    async fn client_on_preserve_header_ext() {
+    async fn client_on_request_ext_preserves_headers() {
         use std::sync::{
             atomic::{AtomicUsize, Ordering},
             Arc,
@@ -2320,9 +2370,136 @@ mod conn {
         orig_headers.insert("X-ZZZ");
         orig_headers.insert("X-AAA");
 
-        wreq_proto::ext::on_preserve_header(&mut req, orig_headers);
+        wreq_proto::ext::on_request(&mut req, orig_headers);
 
         let _res = client.try_send_request(req).await.expect("send_request");
+    }
+
+    #[tokio::test]
+    async fn client_on_request_ext_http1() {
+        let (server, addr) = setup_std_test_server();
+
+        thread::spawn(move || {
+            let mut sock = server.accept().unwrap().0;
+            sock.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            sock.set_write_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut buf = [0; 4096];
+            sock.read(&mut buf).expect("read request");
+            sock.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+                .unwrap();
+        });
+
+        let tcp = tcp_connect(&addr).await.unwrap();
+        let (mut client, conn) = conn::http1::Builder::default()
+            .handshake(TokioIo::new(tcp))
+            .await
+            .unwrap();
+
+        tokio::spawn(async move {
+            conn.await.unwrap();
+        });
+
+        let observed = Arc::new(Mutex::new(None));
+        let mut req = Request::builder()
+            .method(Method::POST)
+            .uri("/observe")
+            .header("X-AAA", "second")
+            .header("X-ZZZ", "first")
+            .body(Full::new(Bytes::from_static(b"body")))
+            .unwrap();
+
+        let mut original_headers = OrigHeaderMap::new();
+        original_headers.insert("X-ZZZ");
+        original_headers.insert("X-AAA");
+
+        wreq_proto::ext::on_request(
+            &mut req,
+            RequestRecorder {
+                original_headers,
+                recorded: observed.clone(),
+            },
+        );
+
+        client.try_send_request(req).await.unwrap();
+
+        let request = observed.lock().unwrap().take().unwrap();
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(request.uri, "/observe");
+        assert_eq!(request.version, http::Version::HTTP_11);
+
+        let headers = request.headers;
+        assert_eq!(headers.len(), 3);
+        assert_eq!(headers[0].0, b"X-ZZZ");
+        assert_eq!(headers[0].1, "first");
+        assert_eq!(headers[1].0, b"X-AAA");
+        assert_eq!(headers[1].1, "second");
+        assert_eq!(headers[2].0, b"content-length");
+        assert_eq!(headers[2].1, "4");
+    }
+
+    #[tokio::test]
+    async fn client_on_request_ext_http2() {
+        let (client_io, server_io, _) = setup_duplex_test_server();
+        tokio::spawn(async move {
+            use hyper::{server::conn::http2, service::service_fn};
+
+            let service = service_fn(|_: Request<hyper::body::Incoming>| async {
+                Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+            });
+
+            http2::Builder::new(TokioExecutor)
+                .serve_connection(TokioIo::new(server_io), service)
+                .await
+                .unwrap();
+        });
+
+        let (mut client, conn) = conn::http2::Builder::new(rt::TokioExecutor::new())
+            .handshake(client_io)
+            .await
+            .unwrap();
+
+        tokio::spawn(async move {
+            conn.await.unwrap();
+        });
+
+        let observed = Arc::new(Mutex::new(None));
+        let mut req = Request::builder()
+            .method(Method::POST)
+            .uri("http://example.test/observe")
+            .header("connection", "keep-alive")
+            .header("X-AAA", "second")
+            .header("X-ZZZ", "first")
+            .body(Full::new(Bytes::from_static(b"body")))
+            .unwrap();
+
+        let mut original_headers = OrigHeaderMap::new();
+        original_headers.insert("X-ZZZ");
+        original_headers.insert("X-AAA");
+
+        wreq_proto::ext::on_request(
+            &mut req,
+            RequestRecorder {
+                original_headers,
+                recorded: observed.clone(),
+            },
+        );
+
+        client.try_send_request(req).await.unwrap();
+
+        let request = observed.lock().unwrap().take().unwrap();
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(request.uri, "http://example.test/observe");
+        assert_eq!(request.version, http::Version::HTTP_2);
+
+        let headers = request.headers;
+        assert_eq!(headers.len(), 3);
+        assert_eq!(headers[0].0, b"x-zzz");
+        assert_eq!(headers[0].1, "first");
+        assert_eq!(headers[1].0, b"x-aaa");
+        assert_eq!(headers[1].1, "second");
+        assert_eq!(headers[2].0, b"content-length");
+        assert_eq!(headers[2].1, "4");
     }
 
     #[tokio::test]

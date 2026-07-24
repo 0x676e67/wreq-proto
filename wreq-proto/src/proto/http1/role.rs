@@ -14,7 +14,7 @@ use super::{Encode, Encoder, Http1Transaction, ParseContext, ParsedMessage};
 use crate::{
     body::DecodedLength,
     error::Parse,
-    ext::{OnPreserveHeader, ReasonPhrase},
+    ext::{OnRequest, ReasonPhrase, RequestContext},
     proto::{headers, BodyLength, MessageHead, RequestHead, RequestLine},
     Error, Result,
 };
@@ -278,20 +278,33 @@ impl Http1Transaction for Client {
         //TODO: add API to http::Uri to encode without std::fmt
         let _ = write!(FastWrite(dst), "{} ", msg.head.subject.1);
 
-        match msg.head.version {
-            Version::HTTP_10 => extend(dst, b"HTTP/1.0"),
-            Version::HTTP_11 => extend(dst, b"HTTP/1.1"),
+        let version = match msg.head.version {
+            Version::HTTP_10 => {
+                extend(dst, b"HTTP/1.0");
+                Version::HTTP_10
+            }
+            Version::HTTP_11 => {
+                extend(dst, b"HTTP/1.1");
+                Version::HTTP_11
+            }
             Version::HTTP_2 => {
                 debug!("request with HTTP2 version coerced to HTTP/1.1");
                 extend(dst, b"HTTP/1.1");
+                Version::HTTP_11
             }
             other => panic!("unexpected request version: {other:?}"),
-        }
+        };
         extend(dst, b"\r\n");
 
-        if let Some(header_sort) = &msg.head.extensions.get::<OnPreserveHeader>() {
-            header_sort.call_visit(&mut msg.head.headers, &mut |name, value| {
-                extend(dst, name.as_ref());
+        if let Some(callback) = msg.head.extensions.get::<OnRequest>() {
+            let mut request = RequestContext::new(
+                &msg.head.subject.0,
+                &msg.head.subject.1,
+                version,
+                &mut msg.head.headers,
+            );
+            callback.write_headers(&mut request, &mut |name, value| {
+                extend(dst, name);
 
                 // Wanted for curl test cases that send `X-Custom-Header:\r\n`
                 if value.is_empty() {
@@ -307,6 +320,7 @@ impl Http1Transaction for Client {
         }
 
         extend(dst, b"\r\n");
+
         msg.head.headers.clear(); //TODO: remove when switching to drain()
 
         Ok(body)
