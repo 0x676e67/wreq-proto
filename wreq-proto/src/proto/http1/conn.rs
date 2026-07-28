@@ -521,6 +521,16 @@ where
 
         self.state.busy();
 
+        // A client request carrying `Connection: close` must not be pooled or
+        // reused. wreq-proto otherwise derives connection reuse from the response
+        // alone, so a backend that ignores the request-side close (omits
+        // `Connection: close` in its response) would leave the connection in
+        // the pool. Disable keep-alive up front so the connection is evicted
+        // regardless of the response.
+        if headers::connection_any_close(&head.headers) {
+            self.state.disable_keep_alive();
+        }
+
         self.enforce_version(&mut head);
         let buf = self.io.headers_buf();
 
