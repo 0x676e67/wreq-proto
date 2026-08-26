@@ -456,6 +456,22 @@ where
     }
 }
 
+impl<B, E, T> ClientTask<B, E, T>
+where
+    B: Body + 'static,
+    E: Http2ClientConnExec<B, T> + Unpin,
+    B::Error: Into<BoxError>,
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    pub(crate) fn current_max_send_streams(&self) -> usize {
+        self.h2_tx.current_max_send_streams()
+    }
+
+    pub(crate) fn current_max_recv_streams(&self) -> usize {
+        self.h2_tx.current_max_recv_streams()
+    }
+}
+
 pin_project! {
     pub(crate) struct ResponseFutMap<B>
     where
