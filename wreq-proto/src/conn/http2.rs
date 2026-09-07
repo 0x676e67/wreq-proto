@@ -120,6 +120,7 @@ where
     ///
     /// If there was an error before trying to serialize the request to the
     /// connection, the message will be returned as part of this error.
+    #[allow(clippy::result_large_err)]
     pub fn try_send_request(
         &mut self,
         req: Request<B>,
@@ -165,6 +166,35 @@ where
             proto::Dispatched::Shutdown => Poll::Ready(Ok(())),
             proto::Dispatched::Upgrade(_pending) => unreachable!("http2 cannot upgrade"),
         }
+    }
+}
+
+impl<T, B, E> Connection<T, B, E>
+where
+    T: AsyncRead + AsyncWrite + Unpin + 'static,
+    B: Body + Unpin + 'static,
+    B::Data: Send,
+    B::Error: Into<BoxError>,
+    E: Http2ClientConnExec<B, T> + Unpin,
+{
+    /// Returns the current maximum send stream count.
+    ///
+    /// This setting is configured in a [`SETTINGS_MAX_CONCURRENT_STREAMS` parameter][1] in a
+    /// `SETTINGS` frame, and may change throughout the connection lifetime.
+    ///
+    /// [1]: https://datatracker.ietf.org/doc/html/rfc7540#section-5.1.2
+    pub fn current_max_send_streams(&self) -> usize {
+        self.inner.1.current_max_send_streams()
+    }
+
+    /// Returns the current maximum receive stream count.
+    ///
+    /// This setting is configured in a [`SETTINGS_MAX_CONCURRENT_STREAMS` parameter][1] in a
+    /// `SETTINGS` frame, and may change throughout the connection lifetime.
+    ///
+    /// [1]: https://datatracker.ietf.org/doc/html/rfc7540#section-5.1.2
+    pub fn current_max_recv_streams(&self) -> usize {
+        self.inner.1.current_max_recv_streams()
     }
 }
 
