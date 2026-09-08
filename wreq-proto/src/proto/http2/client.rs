@@ -28,7 +28,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use super::{
     ping,
     ping::{Ponger, Recorder},
-    H2Upgraded, PipeToSendStream, SendBuf,
+    PipeToSendStream, SendBuf,
 };
 use crate::{
     body::{self, Incoming},
@@ -36,7 +36,10 @@ use crate::{
     error::BoxError,
     ext::OnPreserveHeader,
     proto::{headers, Dispatched},
-    rt::{bounds::Http2ClientConnExec, Time},
+    rt::{
+        bounds::{Http2ClientConnExec, Http2UpgradedExec},
+        Time,
+    },
     upgrade::{self, Upgraded},
     Error, Result,
 };
@@ -260,7 +263,7 @@ where
 
 pin_project! {
     #[project = H2ClientFutureProject]
-    pub enum H2ClientFuture<B, T>
+    pub enum H2ClientFuture<B, T, E>
     where
         B: http_body::Body,
         B: 'static,
@@ -275,7 +278,7 @@ pin_project! {
         },
         Send {
             #[pin]
-            send_when: SendWhen<B>,
+            send_when: SendWhen<B, E>,
         },
         Task {
             #[pin]
@@ -284,11 +287,11 @@ pin_project! {
     }
 }
 
-impl<B, T> Future for H2ClientFuture<B, T>
+impl<B, T, E> Future for H2ClientFuture<B, T, E>
 where
     B: Body + 'static,
-    B::Data: Send,
     B::Error: Into<BoxError>,
+    E: Http2UpgradedExec<B::Data>,
     T: AsyncRead + AsyncWrite + Unpin,
 {
     type Output = ();
@@ -449,6 +452,7 @@ where
                     ping: Some(ping),
                     send_stream: Some(send_stream),
                     cancel_tx: Some(cancel_tx),
+                    exec: self.executor.clone(),
                 },
                 call_back: Some(f.cb),
             },
@@ -473,7 +477,7 @@ where
 }
 
 pin_project! {
-    pub(crate) struct ResponseFutMap<B>
+    pub(crate) struct ResponseFutMap<B, E>
     where
         B: Body,
         B: 'static,
@@ -485,10 +489,11 @@ pin_project! {
         #[pin]
         send_stream: Option<Option<SendStream<SendBuf<<B as Body>::Data>>>>,
         cancel_tx: Option<oneshot::Sender<()>>,
+        exec: E,
     }
 }
 
-impl<B: Body + 'static> ResponseFutMap<B> {
+impl<B: Body + 'static, E> ResponseFutMap<B, E> {
     /// Signal the pipe_task to reset the stream (e.g. on client cancellation).
     pub(crate) fn cancel(self: Pin<&mut Self>) {
         if let Some(cancel_tx) = self.project().cancel_tx.take() {
@@ -497,10 +502,10 @@ impl<B: Body + 'static> ResponseFutMap<B> {
     }
 }
 
-impl<B> Future for ResponseFutMap<B>
+impl<B, E> Future for ResponseFutMap<B, E>
 where
     B: Body + 'static,
-    B::Data: Send,
+    E: Http2UpgradedExec<B::Data>,
 {
     type Output = Result<Response<body::Incoming>, (Error, Option<Request<B>>)>;
 
@@ -532,12 +537,8 @@ where
                     let mut res = Response::from_parts(parts, Incoming::empty());
 
                     let (pending, on_upgrade) = upgrade::pending();
-                    let io = H2Upgraded {
-                        ping,
-                        send_stream,
-                        recv_stream,
-                        buf: Bytes::new(),
-                    };
+                    let (io, task) = super::upgrade::pair(send_stream, recv_stream, ping);
+                    this.exec.execute_upgrade(task);
                     let upgraded = Upgraded::new(io, Bytes::new());
 
                     pending.fulfill(upgraded);

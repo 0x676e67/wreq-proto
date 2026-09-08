@@ -2,16 +2,17 @@
 
 pub(crate) mod client;
 pub(crate) mod ping;
+pub(crate) mod upgrade;
 
 use std::{
     future::Future,
-    io::{self, Cursor, IoSlice},
+    io::{Cursor, IoSlice},
     pin::Pin,
     task::{ready, Context, Poll},
     time::Duration,
 };
 
-use bytes::{Buf, Bytes};
+use bytes::Buf;
 use http::{
     header::{HeaderName, CONNECTION, TE, TRANSFER_ENCODING, UPGRADE},
     HeaderMap,
@@ -20,10 +21,9 @@ pub use http2::frame::{
     Priorities, PrioritiesBuilder, Priority, PseudoId, PseudoOrder, Setting, SettingId,
     SettingsOrder, SettingsOrderBuilder, StreamDependency, StreamId,
 };
-use http2::{Reason, RecvStream, SendStream};
+use http2::SendStream;
 use http_body::Body;
 use pin_project_lite::pin_project;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::{error::BoxError, Error, Result};
 
@@ -329,133 +329,6 @@ impl<B: Buf> Buf for SendBuf<B> {
             Self::Cursor(ref c) => c.chunks_vectored(dst),
             Self::None => 0,
         }
-    }
-}
-
-struct H2Upgraded<B>
-where
-    B: Buf,
-{
-    ping: ping::Recorder,
-    send_stream: SendStream<SendBuf<B>>,
-    recv_stream: RecvStream,
-    buf: Bytes,
-}
-
-impl<B> AsyncRead for H2Upgraded<B>
-where
-    B: Buf,
-{
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        read_buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        if self.buf.is_empty() {
-            self.buf = loop {
-                match ready!(self.recv_stream.poll_data(cx)) {
-                    None => return Poll::Ready(Ok(())),
-                    Some(Ok(buf)) if buf.is_empty() && !self.recv_stream.is_end_stream() => {
-                        continue;
-                    }
-                    Some(Ok(buf)) => {
-                        self.ping.record_data(buf.len());
-                        break buf;
-                    }
-                    Some(Err(e)) => {
-                        return Poll::Ready(match e.reason() {
-                            Some(Reason::NO_ERROR) | Some(Reason::CANCEL) => Ok(()),
-                            Some(Reason::STREAM_CLOSED) => {
-                                Err(io::Error::new(io::ErrorKind::BrokenPipe, e))
-                            }
-                            _ => Err(h2_to_io_error(e)),
-                        });
-                    }
-                }
-            };
-        }
-        let cnt = std::cmp::min(self.buf.len(), read_buf.remaining());
-        read_buf.put_slice(&self.buf[..cnt]);
-        self.buf.advance(cnt);
-        let _ = self.recv_stream.flow_control().release_capacity(cnt);
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl<B> AsyncWrite for H2Upgraded<B>
-where
-    B: Buf,
-{
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        if buf.is_empty() {
-            return Poll::Ready(Ok(0));
-        }
-        self.send_stream.reserve_capacity(buf.len());
-
-        // We ignore all errors returned by `poll_capacity` and `write`, as we
-        // will get the correct from `poll_reset` anyway.
-        let cnt = match ready!(self.send_stream.poll_capacity(cx)) {
-            None => Some(0),
-            Some(Ok(cnt)) => self
-                .send_stream
-                .send_data(SendBuf::Cursor(Cursor::new(buf[..cnt].into())), false)
-                .ok()
-                .map(|()| cnt),
-            Some(Err(_)) => None,
-        };
-
-        if let Some(cnt) = cnt {
-            return Poll::Ready(Ok(cnt));
-        }
-
-        Poll::Ready(Err(h2_to_io_error(
-            match ready!(self.send_stream.poll_reset(cx)) {
-                Ok(Reason::NO_ERROR) | Ok(Reason::CANCEL) | Ok(Reason::STREAM_CLOSED) => {
-                    return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
-                }
-                Ok(reason) => reason.into(),
-                Err(e) => e,
-            },
-        )))
-    }
-
-    #[inline]
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if self
-            .send_stream
-            .send_data(SendBuf::Cursor(Cursor::new([].into())), true)
-            .is_ok()
-        {
-            return Poll::Ready(Ok(()));
-        }
-
-        Poll::Ready(Err(h2_to_io_error(
-            match ready!(self.send_stream.poll_reset(cx)) {
-                Ok(Reason::NO_ERROR) => return Poll::Ready(Ok(())),
-                Ok(Reason::CANCEL) | Ok(Reason::STREAM_CLOSED) => {
-                    return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
-                }
-                Ok(reason) => reason.into(),
-                Err(e) => e,
-            },
-        )))
-    }
-}
-
-fn h2_to_io_error(e: http2::Error) -> std::io::Error {
-    if e.is_io() {
-        e.into_io()
-            .expect("[BUG] http2::Error::is_io() is true, but into_io() failed")
-    } else {
-        std::io::Error::other(e)
     }
 }
 
