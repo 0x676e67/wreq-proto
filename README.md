@@ -11,3 +11,7 @@ This crate defines shared types for [wreq](https://github.com/0x676e67/wreq).
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the [Apache-2.0](./LICENSE) license, shall be licensed as above, without any additional terms or conditions.
+
+## FAQ
+
+**For all issues and feedback, please head over to the [wreq](https://github.com/0x676e67/wreq) repository.**
