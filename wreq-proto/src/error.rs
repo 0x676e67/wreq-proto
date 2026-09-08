@@ -147,6 +147,12 @@ impl Error {
         matches!(self.inner.kind, Kind::User(User::BodyWriteAborted))
     }
 
+    /// Returns true if shutting down the HTTP/1 connection's I/O failed.
+    #[inline]
+    pub fn is_shutdown(&self) -> bool {
+        matches!(self.inner.kind, Kind::Shutdown)
+    }
+
     /// Returns true if the error was caused by a timeout.
     #[inline]
     pub fn is_timeout(&self) -> bool {
