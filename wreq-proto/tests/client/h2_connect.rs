@@ -101,6 +101,23 @@ fn connect() -> (
     TokioIo<hyper::upgrade::Upgraded>,
     http2::SendRequest<Empty<Bytes>>,
 ) {
+    connect_request(
+        Request::connect("localhost:443")
+            .body(Empty::<Bytes>::new())
+            .unwrap(),
+        false,
+    )
+}
+
+fn connect_request(
+    request: Request<Empty<Bytes>>,
+    enable_connect_protocol: bool,
+) -> (
+    Driver,
+    Upgraded,
+    TokioIo<hyper::upgrade::Upgraded>,
+    http2::SendRequest<Empty<Bytes>>,
+) {
     let (tx, rx) = mpsc::channel();
     let executor = Executor(tx);
     let mut driver = Driver {
@@ -114,6 +131,19 @@ fn connect() -> (
     let upgrade_executor = executor.clone();
     let service = service_fn(move |request: Request<hyper::body::Incoming>| {
         assert_eq!(request.method(), http::Method::CONNECT);
+        if enable_connect_protocol {
+            assert_eq!(
+                request
+                    .extensions()
+                    .get::<hyper::ext::Protocol>()
+                    .unwrap()
+                    .as_str(),
+                "websocket"
+            );
+            assert_eq!(request.uri().scheme_str(), Some("https"));
+            assert_eq!(request.uri().authority().unwrap(), "localhost:443");
+            assert_eq!(request.uri().path_and_query().unwrap(), "/chat?room=1");
+        }
         let upgrade = hyper::upgrade::on(request);
         let tx = server_tx.lock().unwrap().take().unwrap();
         upgrade_executor.execute(async move {
@@ -122,13 +152,6 @@ fn connect() -> (
         async { Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new())) }
     });
     let server_executor = executor.clone();
-    driver.spawn(async move {
-        hyper::server::conn::http2::Builder::new(server_executor)
-            .initial_stream_window_size(1024)
-            .serve_connection(TokioIo::new(server_io), service)
-            .await
-            .unwrap();
-    });
     let (mut client, conn) = driver
         .finish(
             http2::Builder::new(executor)
@@ -140,17 +163,51 @@ fn connect() -> (
                 .handshake::<_, Empty<Bytes>>(client_io),
         )
         .unwrap();
+    assert!(!conn.is_extended_connect_protocol_enabled());
+    driver.spawn(async move {
+        let mut builder = hyper::server::conn::http2::Builder::new(server_executor);
+        builder.initial_stream_window_size(1024);
+        if enable_connect_protocol {
+            builder.enable_connect_protocol();
+        }
+        builder
+            .serve_connection(TokioIo::new(server_io), service)
+            .await
+            .unwrap();
+    });
+    driver.run();
+    assert_eq!(
+        conn.is_extended_connect_protocol_enabled(),
+        enable_connect_protocol
+    );
     driver.spawn(async move {
         conn.await.unwrap();
     });
-    let request = Request::connect("localhost:443")
-        .body(Empty::<Bytes>::new())
-        .unwrap();
     let response = driver.finish(client.try_send_request(request)).unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let upgraded = driver.finish(wreq_proto::upgrade::on(response)).unwrap();
     let server = TokioIo::new(driver.finish(server_rx).unwrap());
     (driver, upgraded, server, client)
+}
+
+#[tokio::test]
+async fn h2_extended_connect_peer_support() {
+    let mut request = Request::connect("https://localhost:443/chat?room=1")
+        .body(Empty::<Bytes>::new())
+        .unwrap();
+    request
+        .extensions_mut()
+        .insert(::http2::ext::Protocol::from_static("websocket"));
+    let (mut driver, mut upgraded, mut server, _client) = connect_request(request, true);
+    driver.finish(upgraded.write_all(b"ping")).unwrap();
+    let mut received = [0; 4];
+    driver.finish(server.read_exact(&mut received)).unwrap();
+    assert_eq!(&received, b"ping");
+    driver.finish(server.write_all(b"pong")).unwrap();
+    driver.finish(upgraded.read_exact(&mut received)).unwrap();
+    assert_eq!(&received, b"pong");
+    driver.finish(upgraded.shutdown()).unwrap();
+    driver.finish(server.shutdown()).unwrap();
 }
 
 async fn write_chunks(writer: &mut (impl AsyncWrite + Unpin)) -> io::Result<()> {

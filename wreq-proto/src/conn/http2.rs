@@ -177,6 +177,16 @@ where
     B::Error: Into<BoxError>,
     E: Http2ClientConnExec<B, T> + Unpin,
 {
+    /// Returns whether the server enabled [extended CONNECT][1].
+    ///
+    /// Reflects the current [`SETTINGS_ENABLE_CONNECT_PROTOCOL`][2] value received from the peer.
+    ///
+    /// [1]: https://datatracker.ietf.org/doc/html/rfc8441#section-4
+    /// [2]: https://datatracker.ietf.org/doc/html/rfc8441#section-3
+    pub fn is_extended_connect_protocol_enabled(&self) -> bool {
+        self.inner.1.is_extended_connect_protocol_enabled()
+    }
+
     /// Returns the current maximum send stream count.
     ///
     /// This setting is configured in a [`SETTINGS_MAX_CONCURRENT_STREAMS` parameter][1] in a
