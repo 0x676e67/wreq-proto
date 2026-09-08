@@ -42,6 +42,15 @@ impl<B> Clone for SendRequest<B> {
 ///
 /// In most cases, this should just be spawned into an executor, so that it
 /// can process incoming and outgoing messages, notice hangups, and the like.
+///
+/// # Drop behavior
+///
+/// Dropping this future stops request dispatch and cancels requests still waiting
+/// to be dispatched. Requests and response bodies already handed to background
+/// tasks can continue while the executor runs, so the underlying I/O may remain open.
+///
+/// For graceful shutdown, finish outstanding requests and response bodies, drop all
+/// [`SendRequest`] handles, and let the executor keep driving the background tasks.
 #[must_use = "futures do nothing unless polled"]
 pub struct Connection<T, B, E>
 where

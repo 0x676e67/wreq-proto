@@ -2492,6 +2492,58 @@ mod conn {
             .expect_err("client should be closed");
     }
 
+    #[tokio::test]
+    async fn http2_dispatched_response_survives_connection_drop() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            const BODY: &[u8; 2048] = &[b'x'; 2048];
+            let (client_io, server_io, _) = setup_duplex_test_server();
+            let (accepted_tx, accepted_rx) = oneshot::channel();
+            let (respond_tx, respond_rx) = oneshot::channel();
+            let gate = std::sync::Mutex::new(Some((accepted_tx, respond_rx)));
+            let server = tokio::spawn(async move {
+                hyper::server::conn::http2::Builder::new(TokioExecutor)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(move |_request| {
+                            let (accepted_tx, respond_rx) = gate.lock().unwrap().take().unwrap();
+                            async move {
+                                accepted_tx.send(()).unwrap();
+                                respond_rx.await.unwrap();
+                                Ok::<_, std::convert::Infallible>(Response::new(Full::new(
+                                    Bytes::from_static(BODY),
+                                )))
+                            }
+                        }),
+                    )
+                    .await
+            });
+            let (mut client, connection) = conn::http2::Builder::new(rt::TokioExecutor::new())
+                .handshake::<_, Empty<Bytes>>(client_io)
+                .await
+                .unwrap();
+            let connection = tokio::spawn(connection);
+            let request = Request::get("https://localhost/")
+                .body(Empty::<Bytes>::new())
+                .unwrap();
+            let response = client.try_send_request(request);
+            accepted_rx.await.unwrap();
+
+            // Wait for cancellation to actually drop the public connection before
+            // the server is allowed to produce any response headers or body.
+            connection.abort();
+            assert!(connection.await.unwrap_err().is_cancelled());
+            assert!(client.is_closed());
+            respond_tx.send(()).unwrap();
+
+            let response = response.await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(concat(response.into_body()).await.unwrap().as_ref(), BODY);
+            server.abort();
+        })
+        .await
+        .expect("dispatched response should finish after dropping the connection");
+    }
+
     // This test can intermittently time out while waiting for the connection to close.
     // See [hyper#3896](https://github.com/hyperium/hyper/issues/3896).
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
