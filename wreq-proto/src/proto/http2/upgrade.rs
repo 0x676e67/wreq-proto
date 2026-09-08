@@ -1,5 +1,5 @@
 // Adapted from Hyper's HTTP/2 CONNECT upgrade implementation.
-// Copyright (c) 2014-2025 Sean McArthur
+// Copyright (c) 2014-2026 Sean McArthur
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,12 +23,16 @@ use std::{
     future::Future,
     io::{self, Cursor},
     pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     task::{ready, Context, Poll},
 };
 
 use bytes::{Buf, Bytes};
 use futures_channel::{mpsc, oneshot};
-use futures_util::Stream;
+use futures_util::{task::AtomicWaker, Stream};
 use http2::{Reason, RecvStream, SendStream};
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -42,10 +46,15 @@ pub(super) fn pair<B>(
 ) -> (H2Upgraded, UpgradedSendStreamTask<B>) {
     let (tx, rx) = mpsc::channel(1);
     let (error_tx, error_rx) = oneshot::channel();
+    let close_notify = Arc::new(UpgradedCloseNotify::new());
 
     (
         H2Upgraded {
-            send_stream: UpgradedSendStreamBridge { tx, error_rx },
+            send_stream: UpgradedSendStreamBridge {
+                tx,
+                error_rx,
+                close_notify: close_notify.clone(),
+            },
             recv_stream,
             ping,
             buf: Bytes::new(),
@@ -53,6 +62,7 @@ pub(super) fn pair<B>(
         UpgradedSendStreamTask {
             h2_tx: send_stream,
             rx,
+            close_notify,
             error_tx: Some(error_tx),
         },
     )
@@ -70,6 +80,13 @@ pub(super) struct H2Upgraded {
 struct UpgradedSendStreamBridge {
     tx: mpsc::Sender<Cursor<Box<[u8]>>>,
     error_rx: oneshot::Receiver<crate::Error>,
+    close_notify: Arc<UpgradedCloseNotify>,
+}
+
+/// Wakes the send task when the write bridge closes while waiting for capacity.
+struct UpgradedCloseNotify {
+    closed: AtomicBool,
+    task: AtomicWaker,
 }
 
 pin_project! {
@@ -80,7 +97,46 @@ pin_project! {
         h2_tx: SendStream<SendBuf<B>>,
         #[pin]
         rx: mpsc::Receiver<Cursor<Box<[u8]>>>,
+        close_notify: Arc<UpgradedCloseNotify>,
         error_tx: Option<oneshot::Sender<crate::Error>>,
+    }
+}
+
+// ===== impl UpgradedSendStreamBridge =====
+
+impl Drop for UpgradedSendStreamBridge {
+    fn drop(&mut self) {
+        self.close_notify.close();
+    }
+}
+
+// ===== impl UpgradedCloseNotify =====
+
+impl UpgradedCloseNotify {
+    fn new() -> Self {
+        Self {
+            closed: AtomicBool::new(false),
+            task: AtomicWaker::new(),
+        }
+    }
+
+    fn close(&self) {
+        self.closed.store(true, Ordering::Release);
+        self.task.wake();
+    }
+
+    fn poll_closed(&self, cx: &mut Context<'_>) -> Poll<()> {
+        if self.closed.load(Ordering::Acquire) {
+            return Poll::Ready(());
+        }
+
+        self.task.register(cx.waker());
+
+        if self.closed.load(Ordering::Acquire) {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
     }
 }
 
@@ -103,12 +159,12 @@ where
             // for the actual body chunk.
             me.h2_tx.reserve_capacity(1);
 
-            if me.h2_tx.capacity() == 0 {
+            let h2_has_capacity = if me.h2_tx.capacity() == 0 {
                 // poll_capacity oddly needs a loop
-                'capacity: loop {
+                loop {
                     match me.h2_tx.poll_capacity(cx) {
                         Poll::Ready(Some(Ok(0))) => {}
-                        Poll::Ready(Some(Ok(_))) => break,
+                        Poll::Ready(Some(Ok(_))) => break true,
                         Poll::Ready(Some(Err(e))) => {
                             return Poll::Ready(Err(crate::Error::new_body_write(e)))
                         }
@@ -120,10 +176,12 @@ where
                                 "send stream capacity unexpectedly closed",
                             )));
                         }
-                        Poll::Pending => break 'capacity,
+                        Poll::Pending => break false,
                     }
                 }
-            }
+            } else {
+                true
+            };
 
             match me.h2_tx.poll_reset(cx) {
                 Poll::Ready(Ok(reason)) => {
@@ -136,6 +194,23 @@ where
                     return Poll::Ready(Err(crate::Error::new_body_write(err)))
                 }
                 Poll::Pending => (),
+            }
+
+            // Keep accepted writes queued until HTTP/2 capacity returns, so freeing
+            // a channel slot cannot let the writer bypass flow-control backpressure.
+            // https://www.rfc-editor.org/rfc/rfc9113.html#section-5.2
+            if !h2_has_capacity {
+                // Empty END_STREAM is allowed without window space; observe the queue
+                // without consuming an accepted write that still needs capacity.
+                // https://www.rfc-editor.org/rfc/rfc9113.html#section-6.9.1
+                if me.rx.size_hint().0 == 0 && me.close_notify.poll_closed(cx).is_ready() {
+                    me.h2_tx
+                        .send_data(SendBuf::None, true)
+                        .map_err(crate::Error::new_body_write)?;
+                    return Poll::Ready(Ok(()));
+                }
+
+                return Poll::Pending;
             }
 
             match me.rx.as_mut().poll_next(cx) {
@@ -278,6 +353,7 @@ impl AsyncWrite for H2Upgraded {
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.send_stream.tx.close_channel();
+        self.send_stream.close_notify.close();
         match Pin::new(&mut self.send_stream.error_rx).poll(cx) {
             Poll::Ready(Ok(reason)) => Poll::Ready(Err(io_error(reason))),
             Poll::Ready(Err(_task_dropped)) => Poll::Ready(Ok(())),

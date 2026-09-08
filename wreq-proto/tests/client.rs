@@ -3,6 +3,9 @@
 
 mod support;
 
+#[path = "client/h2_connect.rs"]
+mod h2_connect;
+
 use std::{
     convert::Infallible,
     fmt,
