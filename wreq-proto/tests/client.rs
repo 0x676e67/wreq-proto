@@ -2884,6 +2884,93 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http2_max_local_error_reset_streams() {
+        // Oversized response fields can be rejected with a local stream error:
+        // https://www.rfc-editor.org/rfc/rfc9113.html#section-10.5.1
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for limit in [Some(1), None] {
+                let (client_io, server_io, _) = setup_duplex_test_server();
+                let server = tokio::spawn(async move {
+                    hyper::server::conn::http2::Builder::new(TokioExecutor)
+                        .serve_connection(
+                            TokioIo::new(server_io),
+                            hyper::service::service_fn(
+                                |request: Request<hyper::body::Incoming>| async move {
+                                    let mut response =
+                                        Response::new(Full::new(Bytes::from_static(b"ok")));
+                                    if request.uri().path() == "/large-headers" {
+                                        response.headers_mut().insert(
+                                            "x-large",
+                                            http::HeaderValue::from_bytes(&[b'x'; 1024]).unwrap(),
+                                        );
+                                    }
+                                    Ok::<_, std::convert::Infallible>(response)
+                                },
+                            ),
+                        )
+                        .await
+                });
+                let options = Http2Options::builder()
+                    .max_header_list_size(512)
+                    .max_local_error_reset_streams(Some(1))
+                    .max_local_error_reset_streams(limit)
+                    .build();
+                let (mut client, connection) = conn::http2::Builder::new(rt::TokioExecutor::new())
+                    .options(options)
+                    .handshake::<_, Empty<Bytes>>(client_io)
+                    .await
+                    .unwrap();
+                let connection = tokio::spawn(connection);
+
+                // Exceed the underlying default of 1024 when disabled, so omitting
+                // the explicit None while forwarding options cannot pass this test.
+                let resets = if limit.is_some() { 2 } else { 1025 };
+                for reset in 0..resets {
+                    let request = Request::get("https://localhost/large-headers")
+                        .body(Empty::<Bytes>::new())
+                        .unwrap();
+                    let error = client
+                        .try_send_request(request)
+                        .await
+                        .unwrap_err()
+                        .into_error();
+                    let cause = error
+                        .source()
+                        .unwrap()
+                        .downcast_ref::<::http2::Error>()
+                        .unwrap();
+                    let reason = if limit.is_some() && reset == 1 {
+                        ::http2::Reason::ENHANCE_YOUR_CALM
+                    } else {
+                        ::http2::Reason::PROTOCOL_ERROR
+                    };
+                    assert_eq!(cause.reason(), Some(reason));
+                    assert!(!cause.is_remote());
+                }
+
+                if limit.is_some() {
+                    let error = server.await.unwrap().unwrap_err();
+                    let cause = error.source().unwrap().downcast_ref::<h2::Error>().unwrap();
+                    assert_eq!(cause.reason(), Some(h2::Reason::ENHANCE_YOUR_CALM));
+                    assert!(cause.is_go_away());
+                    assert!(cause.is_remote());
+                } else {
+                    let request = Request::get("https://localhost/ok")
+                        .body(Empty::<Bytes>::new())
+                        .unwrap();
+                    let response = client.try_send_request(request).await.unwrap();
+                    assert_eq!(response.status(), StatusCode::OK);
+                    assert_eq!(concat(response.into_body()).await.unwrap(), "ok");
+                    server.abort();
+                }
+                connection.abort();
+            }
+        })
+        .await
+        .expect("local reset limit test should complete");
+    }
+
+    #[tokio::test]
     async fn h2_connect() {
         let (client_io, server_io, _) = setup_duplex_test_server();
 
