@@ -256,6 +256,12 @@ impl<T> TrySendError<T> {
     pub fn into_error(self) -> Error {
         self.error
     }
+
+    /// Returns a reference to the inner error.
+    #[inline]
+    pub fn error(&self) -> &Error {
+        &self.error
+    }
 }
 
 pin_project! {
