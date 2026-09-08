@@ -472,7 +472,7 @@ pub struct Http2OptionsBuilder {
 /// settings, and more. Most fields are optional and have sensible defaults. See each field for
 /// details.
 #[non_exhaustive]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Http2Options {
     /// Whether to use adaptive flow control.
     pub adaptive_window: bool,

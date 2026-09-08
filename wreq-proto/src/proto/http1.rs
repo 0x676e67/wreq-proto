@@ -100,7 +100,7 @@ pub struct Http1OptionsBuilder {
 /// responses, controlling header handling, buffer sizes, and more. Most settings are optional and
 /// have reasonable defaults.
 #[non_exhaustive]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Http1Options {
     /// Enable support for HTTP/0.9 responses.
     pub h09_responses: bool,
