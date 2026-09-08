@@ -243,6 +243,14 @@ impl<T> TrySendError<T> {
         self.message.take()
     }
 
+    /// Returns a reference to the recovered message.
+    ///
+    /// The message is unavailable after serialization or after [`Self::take_message`].
+    #[inline]
+    pub fn message(&self) -> Option<&T> {
+        self.message.as_ref()
+    }
+
     /// Consumes this to return the inner error.
     #[inline]
     pub fn into_error(self) -> Error {
