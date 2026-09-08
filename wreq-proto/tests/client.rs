@@ -2492,6 +2492,8 @@ mod conn {
             .expect_err("client should be closed");
     }
 
+    // This test can intermittently time out while waiting for the connection to close.
+    // See [hyper#3896](https://github.com/hyperium/hyper/issues/3896).
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn http2_connect_detect_close() {
         // Regression test for failure to fully close connections when using HTTP2 CONNECT
