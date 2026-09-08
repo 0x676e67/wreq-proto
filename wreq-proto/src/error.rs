@@ -135,7 +135,14 @@ impl Error {
         matches!(self.inner.kind, Kind::ChannelClosed)
     }
 
-    /// Returns true if the connection closed before a message could complete.
+    /// Returns true if an HTTP/1 connection closed before a message could complete.
+    ///
+    /// This can happen when the I/O reports EOF while a response is still expected,
+    /// for example if a server closes an idle connection just after a request is sent.
+    /// Errors from decoding a truncated body may use a different classification.
+    ///
+    /// See [RFC 9112 §8](https://www.rfc-editor.org/rfc/rfc9112.html#section-8)
+    /// for HTTP/1.1 message completeness rules.
     #[inline]
     pub fn is_incomplete_message(&self) -> bool {
         matches!(self.inner.kind, Kind::IncompleteMessage)
