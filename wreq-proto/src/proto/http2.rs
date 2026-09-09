@@ -377,6 +377,10 @@ pub struct Http2Options {
     /// The maximum number of concurrent locally reset streams.
     pub max_concurrent_reset_streams: Option<usize>,
 
+    /// How long locally reset stream state is retained.
+    /// `None` uses the default from `http2`.
+    pub reset_stream_duration: Option<Duration>,
+
     /// The maximum size of the send buffer for HTTP/2 streams.
     pub max_send_buffer_size: usize,
 
@@ -634,6 +638,16 @@ impl Http2OptionsBuilder {
         self
     }
 
+    /// Sets how long locally reset stream state is retained to handle late frames
+    /// as described in [RFC 9113 §5.1](https://www.rfc-editor.org/rfc/rfc9113.html#section-5.1).
+    /// The default comes from [`http2::client::Builder::reset_stream_duration`],
+    /// currently 1 second.
+    #[inline]
+    pub fn reset_stream_duration(mut self, dur: Duration) -> Self {
+        self.opts.reset_stream_duration = Some(dur);
+        self
+    }
+
     /// Set the maximum write buffer size for each HTTP/2 stream.
     ///
     /// Default is currently 1MB, but may change.
@@ -774,6 +788,7 @@ impl Default for Http2Options {
             keep_alive_timeout: Duration::from_secs(20),
             keep_alive_while_idle: false,
             max_concurrent_reset_streams: None,
+            reset_stream_duration: None,
             max_send_buffer_size: DEFAULT_MAX_SEND_BUF_SIZE,
             max_pending_accept_reset_streams: None,
             max_local_error_reset_streams: Some(1024),
