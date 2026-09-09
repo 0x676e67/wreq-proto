@@ -138,6 +138,14 @@ where
     ///
     /// If there was an error before trying to serialize the request to the
     /// connection, the message will be returned as part of this error.
+    ///
+    /// # Cancel safety
+    ///
+    /// Drop the returned future to cancel an in-flight request. HTTP/1 cannot
+    /// cancel an individual request on the wire, so the connection closes when
+    /// its driver observes the cancellation. Keep polling [`Connection`] to
+    /// complete this shutdown. The same [`SendRequest`] cannot be reused;
+    /// subsequent requests return a [canceled error](Error::is_canceled).
     #[allow(clippy::result_large_err)]
     pub fn try_send_request(
         &mut self,

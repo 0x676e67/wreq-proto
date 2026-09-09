@@ -13,6 +13,12 @@
 //!
 //! Much of this codebase is adapted and refined from [hyper](https://github.com/hyperium/hyper),
 //! aiming to match its performance and reliability for asynchronous HTTP/1 and HTTP/2.
+//!
+//! # Cancel safety
+//!
+//! Request futures support cancellation by dropping them before completion.
+//! See [`conn::http1::SendRequest::try_send_request`] and
+//! [`conn::http2::SendRequest::try_send_request`] for the effect on each protocol.
 
 #[macro_use]
 mod trace;
