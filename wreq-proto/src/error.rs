@@ -105,6 +105,11 @@ pub(super) struct TimedOut;
 
 impl Error {
     /// Returns true if this was an HTTP parse error.
+    ///
+    /// This can be caused by a malformed HTTP message, an invalid header,
+    /// an invalid URI, an invalid HTTP version, or a message head that is
+    /// too large. Use the more specific `is_parse_*` methods to determine
+    /// the exact cause.
     #[inline]
     pub fn is_parse(&self) -> bool {
         matches!(self.inner.kind, Kind::Parse(_))
@@ -118,18 +123,29 @@ impl Error {
     }
 
     /// Returns true if this error was caused by user code.
+    ///
+    /// For example, this can be returned when the user's `Body` stream
+    /// yields an error.
     #[inline]
     pub fn is_user(&self) -> bool {
         matches!(self.inner.kind, Kind::User(_))
     }
 
     /// Returns true if this was about a `Request` that was canceled.
+    ///
+    /// This typically happens when a pending request is dropped before
+    /// it can be dispatched to the connection, for example because the
+    /// connection was not ready.
     #[inline]
     pub fn is_canceled(&self) -> bool {
         matches!(self.inner.kind, Kind::Canceled)
     }
 
     /// Returns true if a sender's channel is closed.
+    ///
+    /// This can occur when the other side of a client or body channel
+    /// has been dropped, indicating that the receiver is no longer
+    /// interested in the data.
     #[inline]
     pub fn is_closed(&self) -> bool {
         matches!(self.inner.kind, Kind::ChannelClosed)
@@ -149,18 +165,27 @@ impl Error {
     }
 
     /// Returns true if the body write was aborted.
+    ///
+    /// This can occur when an outgoing HTTP/1 body ends before its declared
+    /// content length has been written.
     #[inline]
     pub fn is_body_write_aborted(&self) -> bool {
         matches!(self.inner.kind, Kind::User(User::BodyWriteAborted))
     }
 
     /// Returns true if shutting down the HTTP/1 connection's I/O failed.
+    ///
+    /// This can happen when the connection is being gracefully shut down
+    /// and the underlying IO reports an error during the shutdown sequence.
     #[inline]
     pub fn is_shutdown(&self) -> bool {
         matches!(self.inner.kind, Kind::Shutdown)
     }
 
     /// Returns true if the error was caused by a timeout.
+    ///
+    /// For HTTP/2 clients, this includes the keep-alive timeout (see
+    /// [`keep_alive_timeout`](crate::http2::Http2OptionsBuilder::keep_alive_timeout)).
     #[inline]
     pub fn is_timeout(&self) -> bool {
         self.find_source::<TimedOut>().is_some()
