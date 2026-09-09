@@ -52,6 +52,12 @@ pub struct Parts<T> {
 ///
 /// In most cases, this should just be spawned into an executor, so that it
 /// can process incoming and outgoing messages, notice hangups, and the like.
+///
+/// # Drop behavior
+///
+/// Dropping this future drops the underlying I/O, interrupting requests and
+/// response bodies that still need it. For graceful shutdown, finish outstanding
+/// requests and response bodies, drop [`SendRequest`], and poll this future to completion.
 #[must_use = "futures do nothing unless polled"]
 pub struct Connection<T, B>
 where
