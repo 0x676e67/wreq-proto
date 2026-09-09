@@ -129,6 +129,15 @@ where
     ///
     /// If there was an error before trying to serialize the request to the
     /// connection, the message will be returned as part of this error.
+    ///
+    /// # Cancel safety
+    ///
+    /// Drop the returned future to cancel an in-flight request. If a stream has
+    /// been opened, cancellation resets it with `RST_STREAM` and the `CANCEL`
+    /// error code ([RFC 9113 §7](https://www.rfc-editor.org/rfc/rfc9113.html#section-7)).
+    /// The connection remains usable for other current and subsequent requests.
+    /// Keep driving the connection and its background tasks so the reset can
+    /// reach the peer.
     #[allow(clippy::result_large_err)]
     pub fn try_send_request(
         &mut self,
