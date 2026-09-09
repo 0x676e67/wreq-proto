@@ -37,6 +37,13 @@ macro_rules! header_name {
 macro_rules! header_value {
     ($bytes:expr) => {{
         {
+            // SAFETY:
+            // 1. The input `$bytes` must be a valid header value as per RFC 7230.
+            //    See https://www.rfc-editor.org/rfc/rfc7230#section-3.2.6.
+            // 2. It must not contain CR, LF, DEL, or control bytes other than HTAB;
+            //    SP, visible ASCII, and obs-text bytes are allowed.
+            // 3. The caller uses values validated by httparse and unfolds any
+            //    accepted obsolete line folding before calling this macro.
             #[allow(unsafe_code)]
             unsafe {
                 HeaderValue::from_maybe_shared_unchecked($bytes)
