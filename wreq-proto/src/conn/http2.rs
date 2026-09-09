@@ -281,6 +281,9 @@ where
         if let Some(max) = self.opts.max_concurrent_reset_streams {
             builder.max_concurrent_reset_streams(max);
         }
+        if let Some(dur) = self.opts.reset_stream_duration {
+            builder.reset_stream_duration(dur);
+        }
         if let Some(max) = self.opts.max_concurrent_streams {
             builder.max_concurrent_streams(max);
         }
