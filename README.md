@@ -1,21 +1,57 @@
 # wreq-proto
 
-![Crates.io Version](https://img.shields.io/crates/v/wreq-proto)
+[![Crates.io](https://img.shields.io/crates/v/wreq-proto.svg)](https://crates.io/crates/wreq-proto)
+[![Documentation](https://docs.rs/wreq-proto/badge.svg)][protocol-api]
+[![License](https://img.shields.io/crates/l/wreq-proto.svg)][license]
 
-This crate defines shared types for [wreq](https://github.com/0x676e67/wreq).
+A low-level, asynchronous HTTP client protocol implementation for [wreq].
+
+## Features
+
+- Client-side [HTTP/1](https://www.rfc-editor.org/rfc/rfc9112.html) and [HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html) implementations.
+- Streaming bodies and trailers with backpressure.
+- [HTTP Upgrade](https://www.rfc-editor.org/rfc/rfc9110.html#name-upgrade) and [CONNECT](https://www.rfc-editor.org/rfc/rfc9110.html#name-connect) tunnels, including [HTTP/2 Extended CONNECT](https://www.rfc-editor.org/rfc/rfc8441.html).
+- Pluggable executors and timers, with Tokio and Compio runtime adapters.
+- Optional tracing with no default Cargo features.
+- Tested against [Hyper] servers.
+
+## Usage
+
+Add the protocol crate to `Cargo.toml`:
+
+```toml
+[dependencies]
+wreq-proto = "0.2"
+```
+
+The client APIs are organized by protocol:
+
+```rust
+use wreq_proto::conn::{http1, http2};
+
+fn main() {
+    // ...
+}
+```
 
 ## Documentation
- - Runtime utilities: <https://docs.rs/wreq-rt>
- - Protocol utilities: <https://docs.rs/wreq-proto>
+
+- [Protocol API][protocol-api]
+- [Runtime adapters](https://docs.rs/wreq-rt)
+
+## Relationship
+
+`wreq-proto` is a client-focused fork of [Hyper] for [wreq], incorporating upstream fixes with its own runtime integrations.
 
 ## License
 
-Licensed under either of Apache License, Version 2.0 ([LICENSE](./LICENSE) or http://www.apache.org/licenses/LICENSE-2.0).
+Licensed under either of Apache License, Version 2.0 ([LICENSE][license] or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)).
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the [Apache-2.0](./LICENSE) license, shall be licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the [Apache-2.0][license] license, shall be licensed as above, without any additional terms or conditions.
 
-## FAQ
-
-**For all issues and feedback, please head over to the [wreq](https://github.com/0x676e67/wreq) repository.**
+[wreq]: https://github.com/0x676e67/wreq
+[Hyper]: https://github.com/hyperium/hyper
+[protocol-api]: https://docs.rs/wreq-proto
+[license]: ./LICENSE
