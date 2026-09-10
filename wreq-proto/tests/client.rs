@@ -1575,6 +1575,121 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_flush_before_shutdown() {
+        use std::future::Future;
+
+        struct PendingWrite {
+            io: DuplexStream,
+            resume: Arc<std::sync::atomic::AtomicBool>,
+            written: usize,
+            shutdown_at: Arc<AtomicUsize>,
+        }
+
+        impl tokio::io::AsyncRead for PendingWrite {
+            fn poll_read(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+                buf: &mut tokio::io::ReadBuf<'_>,
+            ) -> Poll<io::Result<()>> {
+                Pin::new(&mut self.io).poll_read(cx, buf)
+            }
+        }
+
+        impl tokio::io::AsyncWrite for PendingWrite {
+            fn poll_write(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+                buf: &[u8],
+            ) -> Poll<io::Result<usize>> {
+                let buf = if !self.resume.load(Ordering::SeqCst) {
+                    if self.written != 0 {
+                        // The test polls the connection again after releasing the gate.
+                        return Poll::Pending;
+                    }
+                    &buf[..buf.len().min(128)]
+                } else {
+                    buf
+                };
+                let written = std::task::ready!(Pin::new(&mut self.io).poll_write(cx, buf))?;
+                self.written += written;
+                Poll::Ready(Ok(written))
+            }
+
+            fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+                Pin::new(&mut self.io).poll_flush(cx)
+            }
+
+            fn poll_shutdown(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+            ) -> Poll<io::Result<()>> {
+                self.shutdown_at.store(self.written, Ordering::SeqCst);
+                Pin::new(&mut self.io).poll_shutdown(cx)
+            }
+        }
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client_io, server_io) = tokio::io::duplex(8192);
+            let (release, released) = oneshot::channel::<()>();
+            let server = tokio::spawn(async move {
+                let parts = hyper::server::conn::http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(|_request| async {
+                            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+                        }),
+                    )
+                    .without_shutdown()
+                    .await
+                    .unwrap();
+                // Keep the transport open so the client can finish its buffered write
+                // after Hyper has sent an early response without consuming the body.
+                let _ = released.await;
+                drop(parts);
+            });
+            let resume = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let shutdown_at = Arc::new(AtomicUsize::new(0));
+            let (mut client, connection) = conn::http1::Builder::default()
+                .handshake(PendingWrite {
+                    io: client_io,
+                    resume: resume.clone(),
+                    written: 0,
+                    shutdown_at: shutdown_at.clone(),
+                })
+                .await
+                .unwrap();
+            let mut connection = std::pin::pin!(connection);
+            let request = client.try_send_request(
+                Request::post("/")
+                    .body(Full::new(Bytes::from(vec![b'a'; 4096])))
+                    .unwrap(),
+            );
+            let mut request = std::pin::pin!(request);
+            let response = poll_fn(|cx| {
+                assert!(
+                    connection.as_mut().poll(cx).is_pending(),
+                    "connection must wait for buffered writes before shutdown"
+                );
+                request.as_mut().poll(cx)
+            })
+            .await
+            .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert!(response.body().is_end_stream());
+            assert_eq!(shutdown_at.load(Ordering::SeqCst), 0);
+
+            resume.store(true, Ordering::SeqCst);
+            connection.await.unwrap();
+            assert!(shutdown_at.load(Ordering::SeqCst) >= 4096);
+            release.send(()).unwrap();
+            server.await.unwrap();
+        })
+        .await
+        .expect("buffered request should flush before shutdown");
+    }
+
+    #[tokio::test]
     async fn http1_max_buf_size_split_header_boundary() {
         // Split the Hyper response within a header value so parsing needs a
         // second read with an already partially filled buffer.
