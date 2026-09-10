@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789027109890,
+  "lastUpdate": 1789028966374,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -8423,6 +8423,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 5505921,
             "range": "± 74266.71",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7fbb519e07c4de2545d2eeb4b92f991f0e8630ca",
+          "message": "fix(release): configure workspace publishing and changelogs (#58)\n\n* fix(release): configure workspace publishing and changelogs\n\n* fix(release): load standalone git-cliff configuration",
+          "timestamp": "2026-09-10T16:25:55+08:00",
+          "tree_id": "953c119ac554c7d9df23ea487769d9d7c98d7119",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/7fbb519e07c4de2545d2eeb4b92f991f0e8630ca"
+        },
+        "date": 1789028965458,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 29299,
+            "range": "± 429.30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 3128282,
+            "range": "± 14177.18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 8577,
+            "range": "± 468.76",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 9530,
+            "range": "± 422.67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 13222,
+            "range": "± 867.20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 40303,
+            "range": "± 1113.70",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 41000011,
+            "range": "± 4057.99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 54289,
+            "range": "± 695.20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 11821128,
+            "range": "± 16270558.71",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 3692356,
+            "range": "± 50844.89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 3620270,
+            "range": "± 58956.59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 26432500,
+            "range": "± 602260.39",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 26488516,
+            "range": "± 317045.21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 2766267,
+            "range": "± 44112.91",
             "unit": "ns/iter"
           }
         ]
