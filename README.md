@@ -1,8 +1,8 @@
 # wreq-proto
 
-[![Crates.io](https://img.shields.io/crates/v/wreq-proto.svg)](https://crates.io/crates/wreq-proto)
-[![Documentation](https://docs.rs/wreq-proto/badge.svg)][protocol-api]
+[![CI](https://github.com/0x676e67/wreq-proto/actions/workflows/ci.yml/badge.svg)](https://github.com/0x676e67/wreq-proto/actions/workflows/ci.yml)
 [![License](https://img.shields.io/crates/l/wreq-proto.svg)][license]
+[![Crates.io](https://img.shields.io/crates/v/wreq-proto.svg)](https://crates.io/crates/wreq-proto)
 
 A low-level, asynchronous HTTP client protocol implementation for [wreq].
 
