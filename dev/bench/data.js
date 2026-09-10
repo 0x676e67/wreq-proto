@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789028966374,
+  "lastUpdate": 1789029746499,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -8531,6 +8531,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 2766267,
             "range": "± 44112.91",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9aeeddbbf087cbf4ecee0135e45a186c7ec4b74b",
+          "message": "Update README badges for CI and Crates.io",
+          "timestamp": "2026-09-10T16:39:37+08:00",
+          "tree_id": "e513e6eb69eab0a154942f7d5da857fd832e0778",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/9aeeddbbf087cbf4ecee0135e45a186c7ec4b74b"
+        },
+        "date": 1789029745488,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 37991,
+            "range": "± 893.34",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 2487816,
+            "range": "± 93241.56",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 14627,
+            "range": "± 134.31",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 15400,
+            "range": "± 498.49",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 18777,
+            "range": "± 1234.82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 56007,
+            "range": "± 3421.50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 41000079,
+            "range": "± 29902.81",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 50657,
+            "range": "± 1629.25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 5256261,
+            "range": "± 301690.43",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 4985028,
+            "range": "± 37015811.99",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 5032487,
+            "range": "± 305707.45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 34407417,
+            "range": "± 2177616.40",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 35691754,
+            "range": "± 2238061.81",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 3573971,
+            "range": "± 171747.40",
             "unit": "ns/iter"
           }
         ]
