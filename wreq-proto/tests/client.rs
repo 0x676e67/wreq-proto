@@ -1575,6 +1575,109 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_max_buf_size_split_header_boundary() {
+        // Split the Hyper response within a header value so parsing needs a
+        // second read with an already partially filled buffer.
+        struct SplitRead {
+            io: DuplexStream,
+            first: bool,
+        }
+
+        impl tokio::io::AsyncRead for SplitRead {
+            fn poll_read(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+                buf: &mut tokio::io::ReadBuf<'_>,
+            ) -> Poll<std::io::Result<()>> {
+                if self.first {
+                    let mut bytes = [0; 7000];
+                    let len = bytes.len().min(buf.remaining());
+                    let mut first = tokio::io::ReadBuf::new(&mut bytes[..len]);
+                    std::task::ready!(Pin::new(&mut self.io).poll_read(cx, &mut first))?;
+                    self.first = false;
+                    buf.put_slice(first.filled());
+                    Poll::Ready(Ok(()))
+                } else {
+                    Pin::new(&mut self.io).poll_read(cx, buf)
+                }
+            }
+        }
+
+        impl tokio::io::AsyncWrite for SplitRead {
+            fn poll_write(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+                buf: &[u8],
+            ) -> Poll<std::io::Result<usize>> {
+                Pin::new(&mut self.io).poll_write(cx, buf)
+            }
+
+            fn poll_flush(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+            ) -> Poll<std::io::Result<()>> {
+                Pin::new(&mut self.io).poll_flush(cx)
+            }
+
+            fn poll_shutdown(
+                mut self: Pin<&mut Self>,
+                cx: &mut Context<'_>,
+            ) -> Poll<std::io::Result<()>> {
+                Pin::new(&mut self.io).poll_shutdown(cx)
+            }
+        }
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for (header_len, too_large) in [(7000, false), (12000, true)] {
+                let (client_io, server_io) = tokio::io::duplex(32768);
+                let server = tokio::spawn(async move {
+                    hyper::server::conn::http1::Builder::new()
+                        .keep_alive(false)
+                        .serve_connection(
+                            TokioIo::new(server_io),
+                            hyper::service::service_fn(move |_request| async move {
+                                Ok::<_, std::convert::Infallible>(
+                                    Response::builder()
+                                        .header("x-large", "a".repeat(header_len))
+                                        .body(Empty::<Bytes>::new())
+                                        .unwrap(),
+                                )
+                            }),
+                        )
+                        .await
+                });
+                let (mut client, connection) = conn::http1::Builder::default()
+                    .options(Http1Options::builder().max_buf_size(8192).build())
+                    .handshake::<_, Empty<Bytes>>(SplitRead {
+                        io: client_io,
+                        first: true,
+                    })
+                    .await
+                    .unwrap();
+                let connection = tokio::spawn(connection);
+                let result = client
+                    .try_send_request(Request::get("/").body(Empty::new()).unwrap())
+                    .await;
+                if too_large {
+                    let error = result
+                        .err()
+                        .expect("split response head must respect max_buf_size");
+                    assert!(error.error().is_parse(), "{error:?}");
+                } else {
+                    let response = result.unwrap();
+                    assert_eq!(response.status(), StatusCode::OK);
+                    assert_eq!(response.headers()["x-large"].as_bytes().len(), header_len);
+                    assert!(concat(response.into_body()).await.unwrap().is_empty());
+                }
+                let _ = connection.await.unwrap();
+                server.await.unwrap().unwrap();
+            }
+        })
+        .await
+        .expect("split header response should finish");
+    }
+
+    #[tokio::test]
     async fn get() {
         let (listener, addr) = setup_tk_test_server().await;
 
