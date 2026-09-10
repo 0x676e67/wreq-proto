@@ -665,7 +665,7 @@ fn decode_trailers(buf: &mut BytesMut, count: usize) -> Result<HeaderMap, io::Er
                     }
                 };
 
-                trailers.insert(name, value);
+                trailers.append(name, value);
             }
 
             Ok(trailers)

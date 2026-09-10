@@ -1575,6 +1575,68 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_trailers_preserve_duplicate_values() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client_io, server_io) = tokio::io::duplex(1024);
+            let server = tokio::spawn(async move {
+                hyper::server::conn::http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(|_request| async {
+                            let mut trailers = HeaderMap::new();
+                            trailers.append("x-trace", "first".parse().unwrap());
+                            trailers.append("x-trace", "second".parse().unwrap());
+                            let frames = [
+                                Ok::<_, std::convert::Infallible>(Frame::data(Bytes::from_static(
+                                    b"hello",
+                                ))),
+                                Ok(Frame::trailers(trailers)),
+                            ];
+                            Ok::<_, std::convert::Infallible>(
+                                Response::builder()
+                                    .header("trailer", "x-trace")
+                                    .body(StreamBody::new(futures_util::stream::iter(frames)))
+                                    .unwrap(),
+                            )
+                        }),
+                    )
+                    .await
+                    .unwrap();
+            });
+            let (mut client, connection) = conn::http1::Builder::default()
+                .handshake(client_io)
+                .await
+                .unwrap();
+            let connection = tokio::spawn(connection);
+            let response = client
+                .try_send_request(
+                    Request::get("/")
+                        .header("te", "trailers")
+                        .body(Empty::<Bytes>::new())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let (body, trailers) = crate::concat_with_trailers(response.into_body())
+                .await
+                .unwrap();
+            assert_eq!(body, "hello");
+            let trailers = trailers.expect("response has trailers");
+            let values = trailers
+                .get_all("x-trace")
+                .iter()
+                .map(|value| value.to_str().unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(values, ["first", "second"]);
+            connection.await.unwrap().unwrap();
+            server.await.unwrap();
+        })
+        .await
+        .expect("response with repeated trailers should finish");
+    }
+
+    #[tokio::test]
     async fn http1_flush_before_shutdown() {
         use std::future::Future;
 
