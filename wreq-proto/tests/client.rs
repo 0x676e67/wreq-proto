@@ -1575,6 +1575,73 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_client_flushes_end_of_body_buffered_by_write_recheck() {
+        /// Yields one data frame, then pends once, then ends the stream.
+        ///
+        /// The `Pending` deliberately arranges no wake-up: it stands in for a body
+        /// whose readiness changes between wreq-proto's two write polls of the same
+        /// `poll_loop` iteration, which is what leaves the end of the message buffered
+        /// by the re-check write.
+        #[derive(Debug, Default)]
+        struct PendOnceThenEnd {
+            polls: u8,
+        }
+
+        impl Body for PendOnceThenEnd {
+            type Data = Bytes;
+            type Error = std::convert::Infallible;
+
+            fn poll_frame(
+                mut self: Pin<&mut Self>,
+                _cx: &mut Context<'_>,
+            ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+                self.polls += 1;
+                match self.polls {
+                    1 => Poll::Ready(Some(Ok(Frame::data(Bytes::from_static(b"hello"))))),
+                    2 => Poll::Pending,
+                    _ => Poll::Ready(None),
+                }
+            }
+        }
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client_io, server_io) = tokio::io::duplex(1024);
+            let server = tokio::spawn(async move {
+                hyper::server::conn::http1::Builder::new()
+                    .keep_alive(false)
+                    .serve_connection(
+                        TokioIo::new(server_io),
+                        hyper::service::service_fn(|request| async move {
+                            assert_eq!(request.headers()["transfer-encoding"], "chunked");
+                            // The whole request must arrive, terminating chunk included.
+                            // Before the fix the body's chunk arrives but `0\r\n\r\n`
+                            // never does, so collecting the body waits forever.
+                            assert_eq!(concat(request.into_body()).await.unwrap(), "hello");
+                            Ok::<_, std::convert::Infallible>(Response::new(Empty::<Bytes>::new()))
+                        }),
+                    )
+                    .await
+                    .unwrap();
+            });
+            let (mut client, connection) = conn::http1::Builder::default()
+                .handshake(client_io)
+                .await
+                .unwrap();
+            let connection = tokio::spawn(connection);
+            let response = client
+                .try_send_request(Request::post("/").body(PendOnceThenEnd::default()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            response.into_body().collect().await.unwrap();
+            connection.await.unwrap().unwrap();
+            server.await.unwrap();
+        })
+        .await
+        .expect("request terminator buffered by the write re-check must be flushed");
+    }
+
+    #[tokio::test]
     async fn http1_request_connection_close_disables_keep_alive() {
         for (connection_values, reusable) in [
             (&[][..], true),
