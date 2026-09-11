@@ -1575,6 +1575,95 @@ mod conn {
     }
 
     #[tokio::test]
+    async fn http1_request_connection_close_disables_keep_alive() {
+        for (connection_values, reusable) in [
+            (&[][..], true),
+            (&["keep-alive"][..], true),
+            (&["xclose"][..], true),
+            (&["close"][..], false),
+            (&["keep-alive, close"][..], false),
+            (&["keep-alive", "close"][..], false),
+            (&["keep-alive", "upgrade, ClOsE"][..], false),
+        ] {
+            tokio::time::timeout(Duration::from_secs(5), async {
+                let (client_io, mut downstream) = tokio::io::duplex(1024);
+                let (mut upstream, server_io) = tokio::io::duplex(1024);
+                let transport = tokio::spawn(async move {
+                    // Hide the first request's Connection fields from Hyper to
+                    // simulate a peer that ignores close. Otherwise Hyper's own
+                    // shutdown would mask whether the client disables reuse.
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") {
+                        head.push(downstream.read_u8().await.unwrap());
+                    }
+                    for line in std::str::from_utf8(&head).unwrap().split("\r\n") {
+                        if line
+                            .split_once(':')
+                            .is_some_and(|(name, _)| name.eq_ignore_ascii_case("connection"))
+                        {
+                            continue;
+                        }
+                        upstream.write_all(line.as_bytes()).await.unwrap();
+                        upstream.write_all(b"\r\n").await.unwrap();
+                        if line.is_empty() {
+                            break;
+                        }
+                    }
+                    tokio::io::copy_bidirectional(&mut downstream, &mut upstream)
+                        .await
+                        .unwrap();
+                });
+                let server = tokio::spawn(async move {
+                    hyper::server::conn::http1::Builder::new()
+                        .serve_connection(
+                            TokioIo::new(server_io),
+                            hyper::service::service_fn(|request| async move {
+                                assert!(!request.headers().contains_key("connection"));
+                                Ok::<_, std::convert::Infallible>(Response::new(Full::new(
+                                    Bytes::from_static(b"hello"),
+                                )))
+                            }),
+                        )
+                        .await
+                        .unwrap();
+                });
+                let (mut client, connection) = conn::http1::Builder::default()
+                    .handshake(client_io)
+                    .await
+                    .unwrap();
+                let connection = tokio::spawn(connection);
+                let mut request = Request::get("/").body(Empty::<Bytes>::new()).unwrap();
+                for value in connection_values {
+                    request
+                        .headers_mut()
+                        .append("connection", value.parse().unwrap());
+                }
+                let response = client.try_send_request(request).await.unwrap();
+                assert!(!response.headers().contains_key("connection"));
+                assert_eq!(concat(response.into_body()).await.unwrap(), "hello");
+                assert_eq!(
+                    client.ready().await.is_ok(),
+                    reusable,
+                    "Connection values: {connection_values:?}"
+                );
+                if reusable {
+                    let response = client
+                        .try_send_request(Request::get("/").body(Empty::<Bytes>::new()).unwrap())
+                        .await
+                        .unwrap();
+                    assert_eq!(concat(response.into_body()).await.unwrap(), "hello");
+                }
+                drop(client);
+                connection.await.unwrap().unwrap();
+                transport.await.unwrap();
+                server.await.unwrap();
+            })
+            .await
+            .expect("request-side close test should finish");
+        }
+    }
+
+    #[tokio::test]
     async fn http1_request_trailers_preserve_duplicate_values() {
         tokio::time::timeout(Duration::from_secs(5), async {
             let (client_io, server_io) = tokio::io::duplex(1024);
