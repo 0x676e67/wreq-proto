@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789087103102,
+  "lastUpdate": 1789105203316,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -8747,6 +8747,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 5503197,
             "range": "± 96445.14",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "56fc782190e893510c8a253ae513bde67d69e05e",
+          "message": "fix(http1): evict pooled conn on request-side Connection: close (#60)\n\nhyper's client derives connection reuse from the response alone, so a\nrequest carrying `Connection: close` whose backend response omits it\n(keeps the socket alive) leaves the connection pooled and reusable.\nDisable keep-alive at request-encode time when the outgoing request\ncarries a `Connection: close` token so the connection is evicted\nregardless of the response.\n\nEvery `Connection` header line is inspected via a `connection_any_close`\nhelper (over `get_all`), not just the first, so a `close` on a later\nline or within a comma-separated value is honored.\n\nAdds a conn-level regression test (client Conn + write_head) asserting a\n`Connection: close` request disables keep-alive -- including\ncomma-separated and multi-line forms -- while a keep-alive request stays\nreusable.\n\nBackport adaptation: the regression uses a wreq-proto client and an upstream\nHyper server instead of inspecting Conn internals, with a test transport\nthat hides the request Connection fields from the server.\n\nCo-authored-by: Sam Landfried <slandfried@bignerdranch.com>\nCo-authored-by: Sam Landfried <samlland@amazon.com>",
+          "timestamp": "2026-09-11T13:37:14+08:00",
+          "tree_id": "2d7e777d56235312acd5a331cb7e9e5977a6c120",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/56fc782190e893510c8a253ae513bde67d69e05e"
+        },
+        "date": 1789105202312,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 90904,
+            "range": "± 16730.63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 3978092,
+            "range": "± 140566.86",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 20788,
+            "range": "± 480.25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 23103,
+            "range": "± 473.01",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 34204,
+            "range": "± 575.64",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 103634,
+            "range": "± 1731.18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 41000030,
+            "range": "± 4612.02",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 84210,
+            "range": "± 5383.74",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 15987163,
+            "range": "± 16435416.29",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 24177105,
+            "range": "± 24706897.36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 7598177,
+            "range": "± 121749.06",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 53840758,
+            "range": "± 290189.57",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 51573494,
+            "range": "± 380040.30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 5420474,
+            "range": "± 261511.01",
             "unit": "ns/iter"
           }
         ]
