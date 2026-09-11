@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789029746499,
+  "lastUpdate": 1789087103102,
   "repoUrl": "https://github.com/0x676e67/wreq-proto",
   "entries": {
     "end_to_end": [
@@ -8639,6 +8639,114 @@ window.BENCHMARK_DATA = {
             "name": "http2_parallel_x10_res_1mb",
             "value": 3573971,
             "range": "± 171747.40",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gngppz@gmail.com",
+            "name": "0x676e67",
+            "username": "0x676e67"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "93842951666a09a513d9e1d1974dfe20775a7179",
+          "message": "fix(http1): use append for repeat trailer values in encoder (#59)\n\nCo-authored-by: greymoth <m.hirakawa07@icloud.com>",
+          "timestamp": "2026-09-11T08:35:28+08:00",
+          "tree_id": "acaa99ec101f971fb3c75ad53c115b6ee22729cf",
+          "url": "https://github.com/0x676e67/wreq-proto/commit/93842951666a09a513d9e1d1974dfe20775a7179"
+        },
+        "date": 1789087101667,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "http1_consecutive_x1_both_100kb",
+            "value": 90105,
+            "range": "± 1266.23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_both_10mb",
+            "value": 6391758,
+            "range": "± 460246.05",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_empty",
+            "value": 21223,
+            "range": "± 558.62",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http1_consecutive_x1_req_10b",
+            "value": 23271,
+            "range": "± 388.46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_empty",
+            "value": 34434,
+            "range": "± 1098.17",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_100kb",
+            "value": 104817,
+            "range": "± 2010.37",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_consecutive_x1_req_10b",
+            "value": 40999950,
+            "range": "± 7276.01",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_empty",
+            "value": 85813,
+            "range": "± 1568.59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks",
+            "value": 16142953,
+            "range": "± 16410516.78",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_adaptive_window",
+            "value": 32598100,
+            "range": "± 222266.62",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10kb_100_chunks_max_window",
+            "value": 7787980,
+            "range": "± 112950.14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_req_10mb",
+            "value": 52092660,
+            "range": "± 871523.91",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_10mb",
+            "value": 51496979,
+            "range": "± 377677.40",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "http2_parallel_x10_res_1mb",
+            "value": 5503197,
+            "range": "± 96445.14",
             "unit": "ns/iter"
           }
         ]
