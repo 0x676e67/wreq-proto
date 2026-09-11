@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## wreq-rt [0.2.2-rc.5](https://github.com/0x676e67/wreq-proto/compare/wreq-rt-v0.2.2-rc.4...wreq-rt-v0.2.2-rc.5) - 2026-09-11
+
+
+
+### Miscellaneous Tasks
+
+- Updated the following local packages: wreq-proto - ([0000000](https://github.com/0x676e67/wreq-proto/commit/0000000))
+
 ## [0.2.2](https://github.com/0x676e67/wreq-proto/compare/v0.2.1...v0.2.2) - 2026-05-08
 
 ### Fixed
