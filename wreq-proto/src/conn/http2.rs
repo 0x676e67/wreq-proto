@@ -205,7 +205,7 @@ where
     ///
     /// Note, if [`Connection`] is not `await`-ed, [`SendRequest`] will
     /// do nothing.
-    pub async fn handshake<T, B>(self, io: T) -> Result<(SendRequest<B>, Connection<T, B, Ex>)>
+    pub async fn handshake<T, B>(mut self, io: T) -> Result<(SendRequest<B>, Connection<T, B, Ex>)>
     where
         T: AsyncRead + AsyncWrite + Unpin,
         B: Body + 'static,
@@ -215,13 +215,22 @@ where
     {
         trace!("client handshake HTTP/2");
 
+        // Omission means the peer uses the protocol default; keep local flow
+        // control consistent even when options were constructed directly.
+        if self.opts.omit_initial_window_size {
+            self.opts.initial_window_size = 65_535;
+            self.opts.adaptive_window = false;
+        }
+
         // Crate the HTTP/2 client with the provided options.
         let mut builder = http2::client::Builder::default();
         builder
             .initial_max_send_streams(self.opts.initial_max_send_streams)
-            .initial_window_size(self.opts.initial_window_size)
             .initial_connection_window_size(self.opts.initial_conn_window_size)
             .max_send_buffer_size(self.opts.max_send_buffer_size);
+        if !self.opts.omit_initial_window_size {
+            builder.initial_window_size(self.opts.initial_window_size);
+        }
         if let Some(id) = self.opts.initial_stream_id {
             builder.initial_stream_id(id);
         }

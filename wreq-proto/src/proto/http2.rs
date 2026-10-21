@@ -486,6 +486,10 @@ pub struct Http2Options {
     /// The initial window size for HTTP/2 streams.
     pub initial_window_size: u32,
 
+    /// Omit SETTINGS_INITIAL_WINDOW_SIZE, using the protocol default of 65,535.
+    /// This overrides the stream window and disables adaptive flow control.
+    pub omit_initial_window_size: bool,
+
     /// The initial maximum number of locally initiated (send) streams.
     pub initial_max_send_streams: usize,
 
@@ -542,6 +546,18 @@ pub struct Http2Options {
 }
 
 impl Http2OptionsBuilder {
+    /// Controls whether to omit SETTINGS_INITIAL_WINDOW_SIZE from the initial frame.
+    ///
+    /// Defaults to `false`, preserving explicit window advertisement. When `true`,
+    /// the effective stream window is 65,535 and adaptive flow control is disabled,
+    /// regardless of the configured window or builder method order. Connection-level
+    /// window configuration is independent and remains unchanged.
+    #[inline]
+    pub fn omit_initial_window_size(mut self, omit: bool) -> Self {
+        self.opts.omit_initial_window_size = omit;
+        self
+    }
+
     /// Sets the [`SETTINGS_INITIAL_WINDOW_SIZE`][spec] option for HTTP2
     /// stream-level flow control.
     ///
@@ -880,6 +896,7 @@ impl Default for Http2Options {
             initial_stream_id: None,
             initial_conn_window_size: DEFAULT_CONN_WINDOW,
             initial_window_size: DEFAULT_STREAM_WINDOW,
+            omit_initial_window_size: false,
             initial_max_send_streams: DEFAULT_INITIAL_MAX_SEND_STREAMS,
             max_frame_size: Some(DEFAULT_MAX_FRAME_SIZE),
             max_header_list_size: Some(DEFAULT_MAX_HEADER_LIST_SIZE),
